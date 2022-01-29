@@ -1,0 +1,29 @@
+.root{
+    -fx-font-size: 18;
+}
+
+.button{
+    -fx-background-color: gold;
+}
+
+.button:hover{
+    -fx-background-color: coral;
+    -fx-font-weight: bold;
+}
+
+#btnAdd{
+    -fx-background-color: #22ff00;
+    -fx-font-size: 20;
+}
+
+#btnAdd:hover{
+    -fx-background-color: #00d4ff;
+    -fx-font-size: 22;
+}
+
+.text-area{
+    -fx-text-fill: blue;
+    -fx-highlight-fill: #00d4ff;
+    -fx-highlight-text-fill: #8800ff;
+    -fx-control-inner-background: rgba(255, 238, 192, 0.49);
+}
