@@ -18,8 +18,6 @@ public class ClientHandler {
     private String nickname;
     private String login;
 
-
-
     public ClientHandler(Server server, Socket socket) {
         this.server = server;
         this.socket = socket;
@@ -72,6 +70,7 @@ public class ClientHandler {
                                 sendMsg(ServiceMessages.REG_NO);
                             }
                         }
+
                     }
                     //цикл работы
                     socket.setSoTimeout(0);
@@ -81,6 +80,7 @@ public class ClientHandler {
                             sendMsg(ServiceMessages.END);
                             break;
                         }
+
                         if (str.startsWith("/w ")) {
                             String[] msg = str.split("\\s", 3);
                             if (msg.length < 3) {
@@ -90,6 +90,18 @@ public class ClientHandler {
                                 server.sendPrivateMsg(this, msg[1], msg[2]);
                             }
 
+                        } else if (str.startsWith(ServiceMessages.CH_NICK)) {
+                            String[] token = str.split(" ", 3);
+                            if (token.length < 3) {
+                                continue;
+                            }
+                            if (server.getAuthService().changeNickname(token[1], token[2])) {
+                                nickname = token[2];
+                                sendMsg(ServiceMessages.CH_OK + " " + nickname);
+                                server.broadcastClientList();
+                            } else {
+                                sendMsg(ServiceMessages.CH_NO);
+                            }
                         } else {
                             server.broadcastMsg(this, str);
                         }

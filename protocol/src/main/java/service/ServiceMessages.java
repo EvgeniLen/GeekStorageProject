@@ -8,4 +8,7 @@ public class ServiceMessages {
     public static final String REG = "/reg";
     public static final String REG_OK = "/reg_ok";
     public static final String REG_NO = "/reg_no";
+    public static final String CH_NICK = "/ch";
+    public static final String CH_OK = "/ch_ok";
+    public static final String CH_NO = "/ch_no";
 }

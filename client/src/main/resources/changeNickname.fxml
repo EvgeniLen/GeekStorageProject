@@ -1,0 +1,21 @@
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.*?>
+<?import java.net.URL?>
+<?import javafx.scene.control.Label?>
+<VBox fx:controller="client.ChangeController"
+      xmlns:fx="http://javafx.com/fxml" alignment="center">
+
+    <stylesheets>
+        <URL value="@/css/style.css"/>
+    </stylesheets>
+
+    <Label text="Old Nickname"/>
+    <TextField fx:id="oldNickname" HBox.hgrow="ALWAYS" promptText="Old Nickname"/>
+    <Label text="New Nickname"/>
+    <TextField fx:id="newNickname" HBox.hgrow="ALWAYS" promptText="New Nickname"/>
+
+    <TextArea fx:id="textArea" VBox.vgrow="ALWAYS" editable="false"/>
+    <Button text="Change" onAction="#clickBtnChange"/>
+</VBox>

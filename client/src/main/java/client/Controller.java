@@ -2,15 +2,13 @@ package client;
 
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
+import javafx.event.Event;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
-import javafx.scene.control.ListView;
-import javafx.scene.control.PasswordField;
-import javafx.scene.control.TextArea;
-import javafx.scene.control.TextField;
+import javafx.scene.control.*;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.stage.Modality;
@@ -35,17 +33,28 @@ public class Controller implements Initializable {
     public HBox msgPanel;
     public HBox authPanel;
     public ListView<String> clientList;
+    public MenuButton menuButton;
+
+    public void setNickname(String nickname) {
+        this.nickname = nickname;
+    }
+
+    public String getNickname() {
+        return nickname;
+    }
 
     private Socket socket;
     private DataInputStream in;
     private DataOutputStream out;
 
     private final String ADDRESS = "localhost";
-    private final int PORT = 8190;
+    private final int PORT = 8189;
 
     private boolean authenticated;
     private String nickname;
     private Stage stage;
+    public Stage chStage;
+    public ChangeController chController;
     public Stage regStage;
     private RegController regController;
 
@@ -111,6 +120,14 @@ public class Controller implements Initializable {
                                     }
                                 });
                             }
+                            if (str.startsWith(ServiceMessages.CH_OK)) {
+                                nickname = str.split("\\s")[1];
+                                setTitle(nickname);
+                                chController.changeStatus(str);
+                            } else if (str.startsWith(ServiceMessages.CH_NO)){
+                                chController.changeStatus(str);
+                            }
+
                         } else {
                             textArea.appendText(str + "\n");
                         }
@@ -167,6 +184,8 @@ public class Controller implements Initializable {
         msgPanel.setManaged(authenticated);
         clientList.setVisible(authenticated);
         clientList.setManaged(authenticated);
+        menuButton.setVisible(authenticated);
+        menuButton.setManaged(authenticated);
 
         if (!authenticated) {
             nickname = "";
@@ -230,5 +249,46 @@ public class Controller implements Initializable {
         }
     }
 
+    public void tryToChange(String oldNickname, String newNickname){
+        if (socket == null || socket.isClosed()) {
+            connect();
+        }
+        String msg = String.format("%s %s %s", ServiceMessages.CH_NICK, oldNickname, newNickname);
+        try {
+            out.writeUTF(msg);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
+    private void createChangeNicknameWindow(){
+        try {
+            FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/changeNickname.fxml"));
+            Parent root = fxmlLoader.load();
+            chStage = new Stage();
+            chStage.setTitle("GeekChat change nickname");
+            chStage.setScene(new Scene(root, 500, 425));
+
+            chStage.initModality(Modality.APPLICATION_MODAL);
+            chStage.initStyle(StageStyle.UTILITY);
+
+            chController = fxmlLoader.getController();
+            chController.setController(this);
+            chController.oldNickname.setText(nickname);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void clickChangeName(Event event) {
+        if (chStage == null) {
+            createChangeNicknameWindow();
+        } else {
+            chController.oldNickname.setText(nickname);
+            chController.newNickname.clear();
+            chController.textArea.clear();
+        }
+        chController.newNickname.requestFocus();
+        chStage.show();
+    }
 }
