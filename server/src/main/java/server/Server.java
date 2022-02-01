@@ -21,6 +21,7 @@ public class Server {
         clients = new CopyOnWriteArrayList<>();
 
         try {
+            authService.connect();
             server = new ServerSocket(PORT);
             System.out.println("Server started!");
 
@@ -30,12 +31,12 @@ public class Server {
                 new ClientHandler(this, socket);
             }
 
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         } finally {
             System.out.println("Server stop");
             try {
-
+                authService.disconnect();
                 server.close();
             } catch (IOException e) {
                 e.printStackTrace();

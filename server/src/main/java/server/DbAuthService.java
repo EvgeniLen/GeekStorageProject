@@ -10,12 +10,14 @@ public class DbAuthService implements AuthService{
     private PreparedStatement prSelectChange;
     private PreparedStatement prSelectNick;
 
-    private void connect() throws Exception {
+    @Override
+    public void connect() throws Exception {
         Class.forName("org.sqlite.JDBC");
         connection = DriverManager.getConnection("jdbc:sqlite:server/chatUsers.db");
     }
 
-    private void disconnect(){
+    @Override
+    public void disconnect(){
         try {
             if (connection!= null) {
                 connection.close();
@@ -36,7 +38,6 @@ public class DbAuthService implements AuthService{
     @Override
     public String getNicknameByLoginAndPassword(String login, String password) {
         try {
-            connect();
             prepareAllStatement();
 
             prSelectNickAndLogin.setString(1, login);
@@ -51,16 +52,12 @@ public class DbAuthService implements AuthService{
         } catch (Exception e) {
             e.printStackTrace();
             return null;
-        } finally {
-            disconnect();
         }
-
     }
 
     @Override
     public boolean registration(String login, String password, String nickname) {
         try {
-            connect();
             prepareAllStatement();
             prSelectNickOrLogin.setString(1, login);
             prSelectNickOrLogin.setString(2, nickname);
@@ -75,15 +72,12 @@ public class DbAuthService implements AuthService{
         }  catch (Exception e) {
             e.printStackTrace();
             return false;
-        } finally {
-            disconnect();
         }
     }
 
     @Override
     public boolean changeNickname(String oldNickname, String newNickName) {
         try {
-            connect();
             prepareAllStatement();
             prSelectNick.setString(1, newNickName);
             if (prSelectNickOrLogin.executeQuery().next()){
@@ -96,8 +90,6 @@ public class DbAuthService implements AuthService{
         }  catch (Exception e) {
             e.printStackTrace();
             return false;
-        } finally {
-            disconnect();
         }
     }
 
