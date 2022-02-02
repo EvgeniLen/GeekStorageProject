@@ -35,4 +35,5 @@ public class RegController {
             textArea.appendText("Регистрация не получилась. Логин или никнейм заняты\n");
         }
     }
+
 }

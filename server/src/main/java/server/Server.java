@@ -11,16 +11,17 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class Server {
     private static ServerSocket server;
     private static Socket socket;
-    private static final int PORT = 8190;
+    private static final int PORT = 8189;
 
     private List<ClientHandler> clients;
     private AuthService authService;
 
     public Server() {
-        authService = new SimpleAuthService();
+        authService = new DbAuthService();
         clients = new CopyOnWriteArrayList<>();
 
         try {
+            authService.connect();
             server = new ServerSocket(PORT);
             System.out.println("Server started!");
 
@@ -30,11 +31,12 @@ public class Server {
                 new ClientHandler(this, socket);
             }
 
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         } finally {
             System.out.println("Server stop");
             try {
+                authService.disconnect();
                 server.close();
             } catch (IOException e) {
                 e.printStackTrace();

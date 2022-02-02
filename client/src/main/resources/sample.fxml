@@ -1,34 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import java.net.URL?>
 <?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.MenuButton?>
+<?import javafx.scene.control.MenuItem?>
+<?import javafx.scene.control.PasswordField?>
 <?import javafx.scene.control.TextArea?>
 <?import javafx.scene.control.TextField?>
-<?import javafx.scene.layout.*?>
-<?import java.net.URL?>
-<?import javafx.scene.control.PasswordField?>
-<?import javafx.scene.control.ListView?>
-<VBox fx:controller="client.Controller"
-      xmlns:fx="http://javafx.com/fxml" alignment="center" >
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox alignment="center" xmlns:fx="http://javafx.com/fxml/1" xmlns="http://javafx.com/javafx/8.0.171" fx:controller="client.Controller">
 
     <stylesheets>
-        <URL value="@/css/style.css"/>
+        <URL value="@/css/style.css" />
     </stylesheets>
 
-    <HBox fx:id="authPanel" >
-        <TextField fx:id="loginField" HBox.hgrow="ALWAYS" promptText="login" />
-        <PasswordField fx:id="passwordField" HBox.hgrow="ALWAYS" promptText="password"/>
-        <Button text="Auth" onAction="#clickBtnAuth"/>
-        <Button text="Reg" onAction="#clickBtnReg"/>
+    <HBox fx:id="authPanel">
+        <TextField fx:id="loginField" promptText="login" HBox.hgrow="ALWAYS" />
+        <PasswordField fx:id="passwordField" promptText="password" HBox.hgrow="ALWAYS" />
+        <Button onAction="#clickBtnAuth" text="Auth" />
+        <Button onAction="#clickBtnReg" text="Reg" />
     </HBox>
 
     <HBox VBox.vgrow="ALWAYS">
-        <TextArea fx:id="textArea" HBox.hgrow="ALWAYS" editable="false"/>
-        <ListView fx:id="clientList" managed="false" visible="false" minWidth="100"
-                  onMouseReleased="#clickClientList"/>
+        <TextArea fx:id="textArea" editable="false" HBox.hgrow="ALWAYS" />
+
+        <VBox>
+            <MenuButton fx:id="menuButton" mnemonicParsing="false" managed="false" visible="false" text="Menu">
+                <items>
+                    <MenuItem mnemonicParsing="false" text="Change nickname" onAction="#clickChangeName"/>
+                </items>
+            </MenuButton>
+            <ListView fx:id="clientList" managed="false" minWidth="100" onMouseReleased="#clickClientList" visible="false"/>
+        </VBox>
+
     </HBox>
 
 
-    <HBox fx:id="msgPanel" visible="false" managed="false">
-        <TextField fx:id="textField" HBox.hgrow="ALWAYS" promptText="input text"  onAction="#clickBtnSendText"/>
-        <Button text="Send text"  onAction="#clickBtnSendText"/>
+    <HBox fx:id="msgPanel" managed="false" visible="false">
+        <TextField fx:id="textField" onAction="#clickBtnSendText" promptText="input text" HBox.hgrow="ALWAYS" />
+        <Button onAction="#clickBtnSendText" text="Send text" />
     </HBox>
 
 </VBox>

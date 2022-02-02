@@ -48,4 +48,19 @@ public class SimpleAuthService implements AuthService{
         users.add(new UserData(login, password, nickname));
         return true;
     }
+
+    @Override
+    public boolean changeNickname(String oldNickname, String newNickName) {
+        return false;
+    }
+
+    @Override
+    public void disconnect() {
+
+    }
+
+    @Override
+    public void connect() throws Exception {
+
+    }
 }
