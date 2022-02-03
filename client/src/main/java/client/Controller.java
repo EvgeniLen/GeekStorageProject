@@ -19,9 +19,11 @@ import service.ServiceMessages;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.net.Socket;
 import java.net.URL;
+import java.util.List;
 import java.util.ResourceBundle;
 
 public class Controller implements Initializable {
@@ -35,14 +37,6 @@ public class Controller implements Initializable {
     public ListView<String> clientList;
     public MenuButton menuButton;
 
-    public void setNickname(String nickname) {
-        this.nickname = nickname;
-    }
-
-    public String getNickname() {
-        return nickname;
-    }
-
     private Socket socket;
     private DataInputStream in;
     private DataOutputStream out;
@@ -52,11 +46,21 @@ public class Controller implements Initializable {
 
     private boolean authenticated;
     private String nickname;
+    private String login;
+    private String fileNameHistory;
     private Stage stage;
     public Stage chStage;
     public ChangeController chController;
     public Stage regStage;
     private RegController regController;
+
+    public void setNickname(String nickname) {
+        this.nickname = nickname;
+    }
+
+    public String getNickname() {
+        return nickname;
+    }
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
@@ -130,6 +134,7 @@ public class Controller implements Initializable {
 
                         } else {
                             textArea.appendText(str + "\n");
+                            LocalHistory.writeHistory(fileNameHistory, str + "\n");
                         }
                     }
                 } catch (IOException e){
@@ -193,6 +198,18 @@ public class Controller implements Initializable {
 
         setTitle(nickname);
         textArea.clear();
+
+        if (authenticated){
+            login = loginField.getText().trim();
+            fileNameHistory = LocalHistory.getFileName(login);
+            List<String> history = LocalHistory.getHistory(fileNameHistory);
+
+            Platform.runLater(() -> {
+                for (int i = history.size() > 100? history.size() - 100 : 0; i < history.size(); i++) {
+                    textArea.appendText(history.get(i) + "\n");
+                }
+            });
+        }
     }
 
     private void setTitle(String nickname) {
