@@ -54,13 +54,5 @@ public class SimpleAuthService implements AuthService{
         return false;
     }
 
-    @Override
-    public void disconnect() {
 
-    }
-
-    @Override
-    public void connect() throws Exception {
-
-    }
 }
