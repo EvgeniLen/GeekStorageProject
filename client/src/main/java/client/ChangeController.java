@@ -22,34 +22,28 @@ public class ChangeController {
         if (result.startsWith(ServiceMessages.CH_OK)) {
             oldNickname.setText(controller.getNickname());
             newNickname.clear();
-            textArea.appendText("Смена никнейма прошла успешно.\n");
+            textArea.appendText(result.split("\\s", 3)[2]);
         }else {
-            textArea.appendText("Смена никнейма не удалась. Возможно указанный никнейм уже занят.\n");
+            textArea.appendText(result.split("\\s", 2)[1]);
         }
 
     }
 
     public void clickBtnChange(ActionEvent actionEvent) {
         textArea.clear();
-        String oldNick = oldNickname.getText().trim();
         String newNick = newNickname.getText().trim();
 
         String error = "";
         if (controller.getNickname().equals(newNick.trim())){
             error = "Укажите никнейм который отличается от старого.\n";
-        } else if (oldNick.trim().equals("")) {
-            error = "Укажите старый никнейм.\n";
-        } else if (!controller.getNickname().equals(oldNick.trim())){
-            error = oldNick + " - это не ваш никнейм.\n";
-        } else if (newNick.trim().equals("")) {
+        }  else if (newNick.trim().equals("")) {
             error = "Укажите новый никнейм.\n";
         }
 
         if (error.length()>0) {
             textArea.appendText(error);
-            oldNickname.setText(controller.getNickname());
             return;
         }
-        controller.tryToChange(oldNick, newNick);
+        controller.tryToChange(newNick);
     }
 }

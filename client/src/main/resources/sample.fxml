@@ -11,7 +11,7 @@
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
 
-<VBox alignment="center" xmlns:fx="http://javafx.com/fxml/1" xmlns="http://javafx.com/javafx/8.0.171" fx:controller="client.Controller">
+<VBox alignment="center" xmlns="http://javafx.com/javafx/8.0.171" xmlns:fx="http://javafx.com/fxml/1" fx:controller="client.Controller">
 
     <stylesheets>
         <URL value="@/css/style.css" />
@@ -28,12 +28,12 @@
         <TextArea fx:id="textArea" editable="false" HBox.hgrow="ALWAYS" />
 
         <VBox>
-            <MenuButton fx:id="menuButton" mnemonicParsing="false" managed="false" visible="false" text="Menu">
+            <MenuButton fx:id="menuButton" managed="false" mnemonicParsing="false" text="Menu" visible="false">
                 <items>
-                    <MenuItem mnemonicParsing="false" text="Change nickname" onAction="#clickChangeName"/>
+                    <MenuItem mnemonicParsing="false" onAction="#clickChangeName" text="Change nickname" />
                 </items>
             </MenuButton>
-            <ListView fx:id="clientList" managed="false" minWidth="100" onMouseReleased="#clickClientList" visible="false"/>
+            <ListView fx:id="clientList" managed="false" minWidth="100" onMouseReleased="#clickClientList" visible="false" />
         </VBox>
 
     </HBox>

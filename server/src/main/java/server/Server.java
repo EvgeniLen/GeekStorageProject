@@ -17,11 +17,13 @@ public class Server {
     private AuthService authService;
 
     public Server() {
+        if (!SQLHandler.connect()) {
+            throw new RuntimeException("Не удалось подключиться к БД");
+        }
         authService = new DbAuthService();
         clients = new CopyOnWriteArrayList<>();
 
         try {
-            authService.connect();
             server = new ServerSocket(PORT);
             System.out.println("Server started!");
 
@@ -34,9 +36,9 @@ public class Server {
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
+            SQLHandler.disconnect();
             System.out.println("Server stop");
             try {
-                authService.disconnect();
                 server.close();
             } catch (IOException e) {
                 e.printStackTrace();

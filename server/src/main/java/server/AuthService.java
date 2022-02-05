@@ -21,15 +21,4 @@ public interface AuthService {
      * иначе вернет false
      * */
     boolean changeNickname(String oldNickname, String newNickName);
-
-    /**
-     * Отключение от базы
-     * */
-    void disconnect();
-
-    /**
-     * Подключение к базе
-     * может быть выброшено Exception
-     * */
-    void connect() throws Exception;
 }

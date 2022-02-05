@@ -19,9 +19,11 @@ import service.ServiceMessages;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.net.Socket;
 import java.net.URL;
+import java.util.List;
 import java.util.ResourceBundle;
 
 public class Controller implements Initializable {
@@ -35,14 +37,6 @@ public class Controller implements Initializable {
     public ListView<String> clientList;
     public MenuButton menuButton;
 
-    public void setNickname(String nickname) {
-        this.nickname = nickname;
-    }
-
-    public String getNickname() {
-        return nickname;
-    }
-
     private Socket socket;
     private DataInputStream in;
     private DataOutputStream out;
@@ -52,11 +46,21 @@ public class Controller implements Initializable {
 
     private boolean authenticated;
     private String nickname;
+    private String login;
+    private String fileNameHistory;
     private Stage stage;
     public Stage chStage;
     public ChangeController chController;
     public Stage regStage;
     private RegController regController;
+
+    public void setNickname(String nickname) {
+        this.nickname = nickname;
+    }
+
+    public String getNickname() {
+        return nickname;
+    }
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
@@ -130,6 +134,7 @@ public class Controller implements Initializable {
 
                         } else {
                             textArea.appendText(str + "\n");
+                            LocalHistory.writeHistory(str);
                         }
                     }
                 } catch (IOException e){
@@ -189,10 +194,18 @@ public class Controller implements Initializable {
 
         if (!authenticated) {
             nickname = "";
+            LocalHistory.stop();
         }
 
         setTitle(nickname);
         textArea.clear();
+
+        if (authenticated){
+            login = loginField.getText().trim();
+            fileNameHistory = LocalHistory.getFileName(login);
+            textArea.appendText(LocalHistory.getHistory(fileNameHistory));
+            LocalHistory.start(fileNameHistory);
+        }
     }
 
     private void setTitle(String nickname) {
@@ -249,11 +262,11 @@ public class Controller implements Initializable {
         }
     }
 
-    public void tryToChange(String oldNickname, String newNickname){
+    public void tryToChange(String newNickname){
         if (socket == null || socket.isClosed()) {
             connect();
         }
-        String msg = String.format("%s %s %s", ServiceMessages.CH_NICK, oldNickname, newNickname);
+        String msg = String.format("%s %s", ServiceMessages.CH_NICK, newNickname);
         try {
             out.writeUTF(msg);
         } catch (IOException e) {
@@ -275,6 +288,7 @@ public class Controller implements Initializable {
             chController = fxmlLoader.getController();
             chController.setController(this);
             chController.oldNickname.setText(nickname);
+            chController.oldNickname.setEditable(false);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -284,7 +298,6 @@ public class Controller implements Initializable {
         if (chStage == null) {
             createChangeNicknameWindow();
         } else {
-            chController.oldNickname.setText(nickname);
             chController.newNickname.clear();
             chController.textArea.clear();
         }

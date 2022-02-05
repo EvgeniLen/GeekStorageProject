@@ -91,16 +91,20 @@ public class ClientHandler {
                             }
 
                         } else if (str.startsWith(ServiceMessages.CH_NICK)) {
-                            String[] token = str.split(" ", 3);
-                            if (token.length < 3) {
+                            String[] token = str.split("\\s+", 2);
+                            if (token.length < 2) {
                                 continue;
                             }
-                            if (server.getAuthService().changeNickname(token[1], token[2])) {
-                                nickname = token[2];
-                                sendMsg(ServiceMessages.CH_OK + " " + nickname);
+                            if (token[1].contains(" ")){
+                                sendMsg(ServiceMessages.CH_NO + " " + "Ник не может содержать пробелов");
+                                continue;
+                            }
+                            if (server.getAuthService().changeNickname(this.nickname, token[1])) {
+                                nickname = token[1];
+                                sendMsg(ServiceMessages.CH_OK + " " + nickname + " Ваш ник изменен на " + nickname);
                                 server.broadcastClientList();
                             } else {
-                                sendMsg(ServiceMessages.CH_NO);
+                                sendMsg(ServiceMessages.CH_NO + " Не удалось изменить ник. Ник " + token[1] + " уже существует");
                             }
                         } else {
                             server.broadcastMsg(this, str);
