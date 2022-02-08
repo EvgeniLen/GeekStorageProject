@@ -7,6 +7,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class Server {
     private static ServerSocket server;
@@ -22,6 +24,7 @@ public class Server {
         }
         authService = new DbAuthService();
         clients = new CopyOnWriteArrayList<>();
+        ExecutorService es = Executors.newCachedThreadPool();
 
         try {
             server = new ServerSocket(PORT);
@@ -30,13 +33,14 @@ public class Server {
             while (true) {
                 socket = server.accept();
                 System.out.println("Client connected: " + socket.getRemoteSocketAddress());
-                new ClientHandler(this, socket);
+                new ClientHandler(this, socket, es);
             }
 
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
             SQLHandler.disconnect();
+            es.shutdown();
             System.out.println("Server stop");
             try {
                 server.close();
