@@ -2,6 +2,7 @@ package server;
 
 import service.ServiceMessages;
 
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -9,11 +10,24 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.logging.Level;
+import java.util.logging.LogManager;
+import java.util.logging.Logger;
 
 public class Server {
+    private static final Logger logger = Logger.getLogger(Server.class.getName());
     private static ServerSocket server;
     private static Socket socket;
     private static final int PORT = 8189;
+
+    static {
+        LogManager manager = LogManager.getLogManager();
+        try {
+            manager.readConfiguration(new FileInputStream("server/logging.properties"));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
     private List<ClientHandler> clients;
     private AuthService authService;
@@ -28,11 +42,13 @@ public class Server {
 
         try {
             server = new ServerSocket(PORT);
-            System.out.println("Server started!");
+            logger.log(Level.INFO, "Server started!");
+            //System.out.println("Server started!");
 
             while (true) {
                 socket = server.accept();
-                System.out.println("Client connected: " + socket.getRemoteSocketAddress());
+                logger.log(Level.INFO, "Client connected: " + socket.getRemoteSocketAddress());
+                //System.out.println("Client connected: " + socket.getRemoteSocketAddress());
                 new ClientHandler(this, socket, es);
             }
 
@@ -41,7 +57,8 @@ public class Server {
         } finally {
             SQLHandler.disconnect();
             es.shutdown();
-            System.out.println("Server stop");
+            logger.log(Level.SEVERE, "Server stop");
+            //System.out.println("Server stop");
             try {
                 server.close();
             } catch (IOException e) {

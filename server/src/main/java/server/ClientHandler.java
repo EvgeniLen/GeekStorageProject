@@ -8,8 +8,11 @@ import java.io.IOException;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.util.concurrent.ExecutorService;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class ClientHandler {
+    private static final Logger logger = Logger.getLogger(ClientHandler.class.getName());
     private Server server;
     private Socket socket;
     private DataInputStream in;
@@ -34,6 +37,7 @@ public class ClientHandler {
                     while (true) {
                         String str = in.readUTF();
                         if (str.equals(ServiceMessages.END)) {
+                            logger.log(Level.FINE, String.format("%s sent a command %s", nickname, str));
                             sendMsg(ServiceMessages.END);
                             break;
                         }
@@ -42,6 +46,7 @@ public class ClientHandler {
                             if (token.length < 3) {
                                 continue;
                             }
+                            logger.log(Level.FINE, String.format("Sent a command %s", str));
                             String newNick = server.getAuthService().getNicknameByLoginAndPassword(token[1], token[2]);
                             login = token[1];
                             if (newNick != null) {
@@ -50,7 +55,8 @@ public class ClientHandler {
                                     authenticated = true;
                                     sendMsg(ServiceMessages.AUTH_OK + " " + nickname);
                                     server.subscribe(this);
-                                    System.out.println("Client: " + nickname + " authenticated");
+                                    logger.log(Level.INFO, "Client " + nickname + " authenticated");
+                                    //System.out.println("Client: " + nickname + " authenticated");
                                     break;
                                 } else {
                                     sendMsg("С этим логином уже зашли в чат");
@@ -65,6 +71,7 @@ public class ClientHandler {
                             if (token.length < 4) {
                                 continue;
                             }
+                            logger.log(Level.FINE, String.format("Sent a command %s", str));
                             if (server.getAuthService().registration(token[1], token[2], token[3])) {
                                 sendMsg(ServiceMessages.REG_OK);
                             } else {
@@ -78,6 +85,7 @@ public class ClientHandler {
                     while (authenticated) {
                         String str = in.readUTF();
                         if (str.equals(ServiceMessages.END)) {
+                            logger.log(Level.FINE, String.format("%s sent a command %s", nickname, str));
                             sendMsg(ServiceMessages.END);
                             break;
                         }
@@ -88,6 +96,7 @@ public class ClientHandler {
                                 continue;
                             }
                             if (msg[2].length() > 0) {
+                                logger.log(Level.FINER, String.format("%s sent a private message to %s '%s'", nickname, msg[1], msg[2]));
                                 server.sendPrivateMsg(this, msg[1], msg[2]);
                             }
 
@@ -100,6 +109,7 @@ public class ClientHandler {
                                 sendMsg(ServiceMessages.CH_NO + " " + "Ник не может содержать пробелов");
                                 continue;
                             }
+                            logger.log(Level.FINE, String.format("Sent a command %s", str));
                             if (server.getAuthService().changeNickname(this.nickname, token[1])) {
                                 nickname = token[1];
                                 sendMsg(ServiceMessages.CH_OK + " " + nickname + " Ваш ник изменен на " + nickname);
@@ -108,6 +118,7 @@ public class ClientHandler {
                                 sendMsg(ServiceMessages.CH_NO + " Не удалось изменить ник. Ник " + token[1] + " уже существует");
                             }
                         } else {
+                            logger.log(Level.FINER, String.format("%s sent a message '%s'", login, str));
                             server.broadcastMsg(this, str);
                         }
                     }
@@ -116,7 +127,8 @@ public class ClientHandler {
                 } catch (IOException e){
                     e.printStackTrace();
                 } finally {
-                    System.out.println("Client disconnect!");
+                    logger.log(Level.INFO,"Client " + nickname + " disconnect!");
+                    //System.out.println("Client disconnect!");
                     server.unsubscribe(this);
                     try {
                         socket.close();
