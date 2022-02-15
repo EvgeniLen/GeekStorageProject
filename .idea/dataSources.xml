@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="DataSourceManagerImpl" format="xml" multifile-model="true">
+    <data-source source="LOCAL" name="chatUsers.db" uuid="180b4c20-9d2f-465a-bb4c-c08d6f1fc487">
+      <driver-ref>sqlite.xerial</driver-ref>
+      <synchronize>true</synchronize>
+      <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
+      <jdbc-url>jdbc:sqlite:D:\Geekbrains\GeekChat\server\chatUsers.db</jdbc-url>
+    </data-source>
+  </component>
+</project>
