@@ -1,161 +1,111 @@
 package server;
 
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
 import service.ServiceMessages;
+import service.serializedClasses.*;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.net.Socket;
-import java.net.SocketTimeoutException;
-import java.util.concurrent.ExecutorService;
+import java.io.FileOutputStream;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class ClientHandler {
+public class ClientHandler extends ChannelInboundHandlerAdapter {
     private static final Logger logger = Logger.getLogger(ClientHandler.class.getName());
-    private Server server;
-    private Socket socket;
-    private DataInputStream in;
-    private DataOutputStream out;
+    private static final List<Channel> channels = new ArrayList<>();
 
-    private boolean authenticated;
-    private String nickname;
+    private Server server;
+    private ChannelHandlerContext ChannelHandlerContext;
     private String login;
 
-    public ClientHandler(Server server, Socket socket, ExecutorService es) {
+    /*private static final Map<Class<? extends BasicRequest>, Consumer<ChannelHandlerContext>> REQUEST_HANDLERS = new HashMap<>();
+
+    static {
+        REQUEST_HANDLERS.put(AuthRequest.class, channelHandlerContext -> {
+
+        });
+    }*/
+    public ClientHandler(Server server) {
         this.server = server;
-        this.socket = socket;
+    }
 
-        try {
-            in = new DataInputStream(socket.getInputStream());
-            out = new DataOutputStream(socket.getOutputStream());
+    @Override
+    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+        ChannelHandlerContext = ctx;
+        BasicRequest request = (BasicRequest) msg;
+        logger.log(Level.FINE, "Request Type = " + request.getType());
 
-            es.execute(() -> {
-                try {
-                    //цикл аутентификации
-                    socket.setSoTimeout(120000);
-                    while (true) {
-                        String str = in.readUTF();
-                        if (str.equals(ServiceMessages.END)) {
-                            logger.log(Level.FINE, String.format("%s sent a command %s", nickname, str));
-                            sendMsg(ServiceMessages.END);
-                            break;
-                        }
-                        if (str.startsWith(ServiceMessages.AUTH)) {
-                            String[] token = str.split("\\s", 3);
-                            if (token.length < 3) {
-                                continue;
-                            }
-                            logger.log(Level.FINE, String.format("Sent a command %s", str));
-                            String newNick = server.getAuthService().getNicknameByLoginAndPassword(token[1], token[2]);
-                            login = token[1];
-                            if (newNick != null) {
-                                if (!server.isLoginAuthenticated(login)) {
-                                    nickname = newNick;
-                                    authenticated = true;
-                                    sendMsg(ServiceMessages.AUTH_OK + " " + nickname);
-                                    server.subscribe(this);
-                                    logger.log(Level.INFO, "Client " + nickname + " authenticated");
-                                    //System.out.println("Client: " + nickname + " authenticated");
-                                    break;
-                                } else {
-                                    sendMsg("С этим логином уже зашли в чат");
-                                }
-                            } else {
-                                sendMsg("Неверный логин / пароль");
-                            }
-                        }
+        if (request instanceof AuthRequest) {
+            AuthRequest authRequest = (AuthRequest) request;
+            logger.log(Level.FINE, String.format("Authentication request from %s", authRequest.getLogin()));
+            boolean result = server.getAuthService().getAutentificationResult(authRequest.getLogin(), authRequest.getPassword());
+            login = authRequest.getLogin();
+            if (result) {
+                sendBasicMsg(ServiceMessages.AUTH_OK);
+                FileHandler.createUserDirectory(login); // создание серверной директории пользователя, если нет
+                server.subscribe(this);
+                logger.log(Level.INFO, "Client " + login + " authenticated");
+            } else {
+                sendBasicMsg("Неверный логин / пароль");
+            }
+        } else if (request instanceof RegRequest){
+            RegRequest regRequest = (RegRequest) request;
+            logger.log(Level.FINE, String.format("Registration request from %s", regRequest.getLogin()));
+            if (server.getAuthService().registration(regRequest.getLogin(), regRequest.getPassword())) {
+                FileHandler.createUserDirectory(regRequest.getLogin()); // создание серверной директории пользователя, если нет
+                sendBasicMsg(ServiceMessages.REG_OK);
+            } else {
+                sendBasicMsg(ServiceMessages.REG_NO);
+            }
+        }else if (request instanceof GetFileListRequest){
+            //надо добавить проверку логин\пароля
+            GetFileListRequest getFileListRequest = (GetFileListRequest) request;
 
-                        if (str.startsWith(ServiceMessages.REG)) {
-                            String[] token = str.split(" ", 4);
-                            if (token.length < 4) {
-                                continue;
-                            }
-                            logger.log(Level.FINE, String.format("Sent a command %s", str));
-                            if (server.getAuthService().registration(token[1], token[2], token[3])) {
-                                sendMsg(ServiceMessages.REG_OK);
-                            } else {
-                                sendMsg(ServiceMessages.REG_NO);
-                            }
-                        }
+            List<FileInfo> listFiles = FileHandler.getFilesAndDirectories(getFileListRequest.getLogin(), getFileListRequest.getSubDirection());
+            GetFileListResponse getFileListResponse = new GetFileListResponse(getFileListRequest.getSubDirection(), listFiles);
+            ChannelHandlerContext.writeAndFlush(getFileListResponse);
+        } else if (request instanceof SendFileRequest){
+            //надо добавить проверку логин\пароля
+            SendFileRequest sendFileRequest = (SendFileRequest) request;
+            System.out.println(sendFileRequest.getPath());
 
-                    }
-                    //цикл работы
-                    socket.setSoTimeout(0);
-                    while (authenticated) {
-                        String str = in.readUTF();
-                        if (str.equals(ServiceMessages.END)) {
-                            logger.log(Level.FINE, String.format("%s sent a command %s", nickname, str));
-                            sendMsg(ServiceMessages.END);
-                            break;
-                        }
+            FileHandler.createFile(sendFileRequest);
 
-                        if (str.startsWith("/w ")) {
-                            String[] msg = str.split("\\s", 3);
-                            if (msg.length < 3) {
-                                continue;
-                            }
-                            if (msg[2].length() > 0) {
-                                logger.log(Level.FINER, String.format("%s sent a private message to %s '%s'", nickname, msg[1], msg[2]));
-                                server.sendPrivateMsg(this, msg[1], msg[2]);
-                            }
 
-                        } else if (str.startsWith(ServiceMessages.CH_NICK)) {
-                            String[] token = str.split("\\s+", 2);
-                            if (token.length < 2) {
-                                continue;
-                            }
-                            if (token[1].contains(" ")){
-                                sendMsg(ServiceMessages.CH_NO + " " + "Ник не может содержать пробелов");
-                                continue;
-                            }
-                            logger.log(Level.FINE, String.format("Sent a command %s", str));
-                            if (server.getAuthService().changeNickname(this.nickname, token[1])) {
-                                nickname = token[1];
-                                sendMsg(ServiceMessages.CH_OK + " " + nickname + " Ваш ник изменен на " + nickname);
-                                server.broadcastClientList();
-                            } else {
-                                sendMsg(ServiceMessages.CH_NO + " Не удалось изменить ник. Ник " + token[1] + " уже существует");
-                            }
-                        } else {
-                            logger.log(Level.FINER, String.format("%s sent a message '%s'", login, str));
-                            server.broadcastMsg(this, str);
-                        }
-                    }
-                } catch (SocketTimeoutException e){
-                    sendMsg(ServiceMessages.END);
-                } catch (IOException e){
-                    e.printStackTrace();
-                } finally {
-                    logger.log(Level.INFO,"Client " + nickname + " disconnect!");
-                    //System.out.println("Client disconnect!");
-                    server.unsubscribe(this);
-                    try {
-                        socket.close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-            });
-        } catch (IOException e) {
-            e.printStackTrace();
+
         }
-
     }
 
     public String getLogin() {
         return login;
     }
 
-    public void sendMsg(String msg){
-        try {
-            out.writeUTF(msg);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+    public void sendBasicMsg(String msg){
+        BasicResponse basicResponse = new BasicResponse(msg);
+        ChannelHandlerContext.writeAndFlush(basicResponse);
     }
 
-    public String getNickname() {
-        return nickname;
+    @Override
+    public void channelActive(ChannelHandlerContext ctx) throws Exception {
+        logger.log(Level.INFO, "Client connected: " + ctx.channel().remoteAddress());
+        channels.add(ctx.channel());
+    }
+
+    @Override
+    public void channelInactive(io.netty.channel.ChannelHandlerContext ctx) throws Exception {
+        logger.log(Level.FINE, "Client disconnected: " + ctx.channel().remoteAddress());
+        channels.remove(ctx.channel());
+        ctx.close();
+    }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        cause.printStackTrace();
+        channels.remove(ctx.channel());
+        logger.log(Level.FINE, "Error, Client disconnected: " + ctx.channel().remoteAddress());
+        ctx.close();
     }
 }

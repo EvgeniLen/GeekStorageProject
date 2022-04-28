@@ -6,13 +6,12 @@ public class SQLHandler {
     private static Connection connection;
     private static PreparedStatement prInsert;
     private static PreparedStatement prSelectNickAndLogin;
-    private static PreparedStatement prSelectChange;
 
 
     public static boolean connect(){
         try {
             Class.forName("org.sqlite.JDBC");
-            connection = DriverManager.getConnection("jdbc:sqlite:server/chatUsers.db");
+            connection = DriverManager.getConnection("jdbc:sqlite:server/geekStorage.db");
             prepareAllStatement();
             return true;
         } catch (Exception e) {
@@ -24,7 +23,6 @@ public class SQLHandler {
     public static void disconnect(){
         try {
             prInsert.close();
-            prSelectChange.close();
             prSelectNickAndLogin.close();
         } catch (SQLException e) {
             e.printStackTrace();
@@ -39,33 +37,30 @@ public class SQLHandler {
     }
 
     private static void prepareAllStatement() throws SQLException {
-        prSelectNickAndLogin = connection.prepareStatement("SELECT nickname FROM users WHERE login = ? AND password = ?");
-        prSelectChange = connection.prepareStatement("UPDATE users SET nickname = ? WHERE nickname = ?");
-        prInsert = connection.prepareStatement("INSERT INTO users (login, password, nickname) VALUES (?, ?, ?)");
+        prSelectNickAndLogin = connection.prepareStatement("SELECT login FROM users WHERE login = ? AND password = ?");
+        prInsert = connection.prepareStatement("INSERT INTO users (login, password) VALUES (?, ?)");
     }
 
-    public static String getNicknameByLoginAndPassword(String login, String password) {
-        String nick = null;
+    public static boolean getAutentificationResult(String login, String password) {
+        boolean isAuthenticated = false;
         try {
             prSelectNickAndLogin.setString(1, login);
             prSelectNickAndLogin.setString(2, password);
             ResultSet result = prSelectNickAndLogin.executeQuery();
-
             if (result.next()) {
-                nick = result.getString("nickname");
+                isAuthenticated = true;
             }
             result.close();
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        return nick;
+        return isAuthenticated;
     }
 
-    public static boolean registration(String login, String password, String nickname) {
+    public static boolean registration(String login, String password) {
         try {
             prInsert.setString(1, login);
             prInsert.setString(2,  password);
-            prInsert.setString(3, nickname);
             prInsert.executeUpdate();
             return true;
         }  catch (SQLException e) {
@@ -74,15 +69,4 @@ public class SQLHandler {
         }
     }
 
-    public static boolean changeNickname(String oldNickname, String newNickName) {
-        try {
-            prSelectChange.setString(1, newNickName);
-            prSelectChange.setString(2, oldNickname);
-            prSelectChange.executeUpdate();
-            return true;
-        }  catch (SQLException e) {
-            e.printStackTrace();
-            return false;
-        }
-    }
 }

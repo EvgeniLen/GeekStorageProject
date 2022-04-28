@@ -7,12 +7,12 @@ import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import service.ServiceMessages;
 
+
 public class RegController {
 
     @FXML
     public TextField loginField;
     public PasswordField passwordField;
-    public TextField nicknameField;
     public TextArea textArea;
 
     private Controller controller;
@@ -24,15 +24,14 @@ public class RegController {
     public void clickBtnReg(ActionEvent actionEvent) {
         String login = loginField.getText().trim();
         String password = passwordField.getText().trim();
-        String nickname = nicknameField.getText().trim();
-        controller.tryToReg(login, password, nickname);
+        controller.tryToReg(login, password);
     }
 
     public void regStatus(String result){
         if (result.equals(ServiceMessages.REG_OK)){
             textArea.appendText("Регистрация прошла успешно\n");
         } else {
-            textArea.appendText("Регистрация не получилась. Логин или никнейм заняты\n");
+            textArea.appendText("Регистрация не получилась. Логин занят\n");
         }
     }
 
