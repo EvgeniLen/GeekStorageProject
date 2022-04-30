@@ -4,3 +4,4 @@ module service {
     exports service.serializedClasses;
 
 }
+

@@ -24,17 +24,13 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
-import service.serializedClasses.AuthRequest;
-import service.serializedClasses.GetFileListRequest;
-import service.serializedClasses.RegRequest;
-import service.serializedClasses.SendFileRequest;
+import service.serializedClasses.*;
 
 
-import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.URL;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ResourceBundle;
@@ -87,16 +83,20 @@ public class Controller  implements Initializable{
         return localPC;
     }
 
+    private Network network;
+
     public ServerFilePanelController getServerPC() {
         return serverPC;
     }
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
+        network = new Network(this);
         setAuthenticated(false);
     }
 
     public void connect(){
+        //Вынести в отдельный класс! отправку сообщений тоже
             EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
             try {
                 bootstrap = new Bootstrap();
@@ -116,29 +116,20 @@ public class Controller  implements Initializable{
                 });
                 ChannelFuture channelFuture =  bootstrap.connect().sync();
                 channel = channelFuture.channel();
+                channelFuture.channel().closeFuture();
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             } //finally {
               //  eventLoopGroup.shutdownGracefully();
            // }
+
+        //сделать отдельный метод close channel.close
     }
 
     public void clickBtnAuth(ActionEvent actionEvent) {
-        if (channel == null) {
-            connect();
-        }
-        AuthRequest authRequest = new AuthRequest(loginField.getText().trim(), passwordField.getText().trim());
-        channel.writeAndFlush(authRequest);
+        network.sendRequest(new AuthRequest(loginField.getText().trim(), passwordField.getText().trim()));
         login = loginField.getText().trim();
         //passwordField.clear();
-    }
-
-    public void sendFileListRequest(String subDirection){
-        if (channel == null) {
-            connect();
-        }
-        GetFileListRequest getFileListRequest =  new GetFileListRequest(login, password, subDirection);
-        channel.writeAndFlush(getFileListRequest);
     }
 
     public void setAuthenticated(boolean authenticated) {
@@ -156,7 +147,6 @@ public class Controller  implements Initializable{
 
         if (!authenticated) {
             nickname = "";
-            LocalHistory.stop();
         }
 
         textArea.clear();
@@ -165,7 +155,9 @@ public class Controller  implements Initializable{
             login = loginField.getText().trim();
             password = passwordField.getText().trim();
             localPC = (LocalFilePanelController) localPanel.getProperties().get("ctrl");
+
             serverPC = (ServerFilePanelController) serverPanel.getProperties().get("ctrl");
+            serverPC.setController(this);
         }
     }
 
@@ -188,18 +180,10 @@ public class Controller  implements Initializable{
             regStage.initStyle(StageStyle.UTILITY);
 
             regController = fxmlLoader.getController();
-            regController.setController(this);
+            regController.setNetwork(network);
         } catch (IOException e) {
             e.printStackTrace();
         }
-    }
-
-    public void tryToReg(String login, String password){
-        if (channel == null) {
-            connect();
-        }
-        RegRequest regRequest = new RegRequest(login, password);
-        channel.writeAndFlush(regRequest);
     }
 
     public String getLogin() {
@@ -211,55 +195,55 @@ public class Controller  implements Initializable{
     }
 
     public void btnExit(ActionEvent actionEvent) {
+        network.close();
         Platform.exit();
     }
 
     public void copyButtonAction(ActionEvent actionEvent) {
-        //Доделать копирование
-
-        //LocalFilePanelController localPC = (LocalFilePanelController) localPanel.getProperties().get("ctrl");
-        //ServerFilePanelController serverPC = (ServerFilePanelController) serverPanel.getProperties().get("ctrl");
-        //localPC = (LocalFilePanelController) localPanel.getProperties().get("ctrl");
-        //serverPC = (LocalFilePanelController) serverPanel.getProperties().get("ctrl");
-
         if (localPC.getSelectedFileName() == null && serverPC.getSelectedFileName() == null) {
             Alert alert = new Alert(Alert.AlertType.ERROR, "Ни один файл для копирования не выбран", ButtonType.OK);
             alert.showAndWait();
             return;
         }
 
-        LocalFilePanelController srcPC = null;
-        ServerFilePanelController dstPC = null;
-        if (localPC.getSelectedFileName() != null) {
-            srcPC = localPC;
-            dstPC = serverPC;
-        }
-        //Доделатть для копирования c сервера
-        //if (serverPC.getSelectedFileName() != null) {
-       //     srcPC = serverPC;
-       //     dstPC = localPC;
-        //}
-
-        Path srcPath = Paths.get(srcPC.getCurrentPath(), srcPC.getSelectedFileName());
-        Path dstPath = Paths.get(dstPC.getCurrentPath()).resolve(srcPath.getFileName().toString());
-        System.out.println(dstPath);
+        //Копировование с локала на сервер
         try {
-            FileInputStream fileInputStream = new FileInputStream(srcPath.toFile());
-            byte[] data = new byte[fileInputStream.available()];
-            fileInputStream.read(data);
-            fileInputStream.close();
-            if (channel == null) {
-                connect();
-            }
-            SendFileRequest sendFileRequest = new SendFileRequest(login, password, data, dstPath.toString());
-            channel.writeAndFlush(sendFileRequest);
-            //sendFileListRequest(dstPC.getCurrentPath());
+            //Копировование с локала на сервер
+            if (localPC.getSelectedFileName() != null) {
+                LocalFilePanelController srcPC = null;
+                ServerFilePanelController dstPC = null;
+                srcPC = localPC;
+                dstPC = serverPC;
+                Path srcPath = Paths.get(srcPC.getCurrentPath(), srcPC.getSelectedFileName());
+                Path dstPath = Paths.get(dstPC.getCurrentPath()).resolve(srcPath.getFileName().toString());
 
-            //Files.copy(srcPath, dstPath);
-            //dstPC.updateList(Paths.get(dstPC.getCurrentPath()));
+                FileInputStream fileInputStream = new FileInputStream(srcPath.toFile());
+                byte[] data = new byte[fileInputStream.available()];
+                fileInputStream.read(data);
+                fileInputStream.close();
+                network.sendRequest(new SendFileRequest(login, password, data, dstPath.toString(), srcPath.toString()));
+                network.sendRequest(new GetFileListRequest(login, password, dstPC.getCurrentPath()));
+            } else if (serverPC.getSelectedFileName() != null) {
+                ServerFilePanelController srcPC = null;
+                LocalFilePanelController dstPC = null;
+                srcPC = serverPC;
+                dstPC = localPC;
+                System.out.println(srcPC.getCurrentPath());
+                System.out.println(srcPC.getSelectedFileName());
+                Path srcPath = Paths.get(srcPC.getCurrentPath().equals(File.separator) ? "": srcPC.getCurrentPath(), srcPC.getSelectedFileName());
+                Path dstPath = Paths.get(dstPC.getCurrentPath()).resolve(srcPath.getFileName().toString());
+                System.out.println(dstPath);
+                network.sendRequest(new UploadFileRequest(login, password, srcPath.toString(), dstPath.toString()));
+            }
         } catch (IOException e) {
+            e.printStackTrace();
             Alert alert = new Alert(Alert.AlertType.ERROR, "Не удалось скопировать указанный файл", ButtonType.OK);
             alert.showAndWait();
         }
+
+    }
+
+    public Network getNetwork() {
+        return network;
     }
 }

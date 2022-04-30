@@ -1,6 +1,7 @@
 package server;
 
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.EventLoopGroup;
@@ -16,6 +17,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
@@ -26,6 +28,10 @@ import java.util.logging.Logger;
 
 public class Server {
     private static final Logger logger = Logger.getLogger(Server.class.getName());
+
+
+
+    private final List<Channel> channels = new ArrayList<>();
     private static final int PORT = 45081;
 
     private static final int MB_20 = 20 * 1_000_000;
@@ -41,6 +47,10 @@ public class Server {
 
     private List<ClientHandler> clients;
     private AuthService authService;
+
+    public List<Channel> getChannels() {
+        return channels;
+    }
 
     public Server() {
         if (!SQLHandler.connect()) {

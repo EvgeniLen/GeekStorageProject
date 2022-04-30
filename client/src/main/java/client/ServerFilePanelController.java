@@ -7,9 +7,13 @@ import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
 import service.serializedClasses.FileInfo;
+import service.serializedClasses.GetFileListRequest;
+import service.serializedClasses.SendFileRequest;
 
 import java.io.File;
 import java.net.URL;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.ResourceBundle;
@@ -21,9 +25,14 @@ public class ServerFilePanelController implements Initializable {
     public TextField patchField;
 
     private Controller controller;
+    private Network network;
 
     public void setController(Controller controller) {
         this.controller = controller;
+    }
+
+    public void setNetwork(Network network) {
+        this.network = network;
     }
 
     @Override
@@ -65,20 +74,14 @@ public class ServerFilePanelController implements Initializable {
         filesTable.getColumns().addAll(fileTypeColumn, fileNameColumn, fileSizeColumn, fileDateColumn);
         filesTable.getSortOrder().add(fileTypeColumn);
 
-
-
         filesTable.setOnMouseClicked(mouseEvent -> {
             if(mouseEvent.getClickCount() == 2){
                 String dir = patchField.getText() + filesTable.getSelectionModel().getSelectedItem().getFilename();
                 if (filesTable.getSelectionModel().getSelectedItem().getType().getName().equals("D")){
-                    controller.sendFileListRequest(dir);
+                    network.sendRequest(new GetFileListRequest(controller.getLogin(), controller.getPassword(), dir));
                 }
             }
         });
-
-        //updateList(Paths.get(DIR));
-        //Заполняем локальную таблицу
-
     }
 
     public void updateList(String subDirection, List<FileInfo> files){
@@ -92,9 +95,11 @@ public class ServerFilePanelController implements Initializable {
     }
 
     public void patchUpAction(ActionEvent actionEvent) {
-        String dir = patchField.getText();
-        dir = dir.substring(0, dir.indexOf(File.separator));
-        controller.sendFileListRequest(dir);
+        Path upperPatch = Paths.get(patchField.getText()).getParent();
+        if (upperPatch != null) {
+            network.sendRequest(new GetFileListRequest(controller.getLogin(), controller.getPassword(), upperPatch.toString()));
+        }
+
     }
 
     public String getSelectedFileName(){
