@@ -11,29 +11,24 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.serialization.ClassResolvers;
 import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.codec.serialization.ObjectEncoder;
-import service.ServiceMessages;
+import org.apache.commons.codec.digest.DigestUtils;
+import service.serializedClasses.AuthRequest;
+import service.serializedClasses.BasicRequest;
 
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.net.ServerSocket;
-import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
 public class Server {
     private static final Logger logger = Logger.getLogger(Server.class.getName());
-
-
-
-    private final List<Channel> channels = new ArrayList<>();
     private static final int PORT = 45081;
-
     private static final int MB_20 = 20 * 1_000_000;
 
     static {
@@ -45,11 +40,15 @@ public class Server {
         }
     }
 
-    private List<ClientHandler> clients;
-    private AuthService authService;
+    private final Map<String, String> clients;
+    private final AuthService authService;
 
-    public List<Channel> getChannels() {
-        return channels;
+    public Map<String, String> getClients() {
+        return clients;
+    }
+
+    public AuthService getAuthService() {
+        return authService;
     }
 
     public Server() {
@@ -57,7 +56,7 @@ public class Server {
             throw new RuntimeException("Не удалось подключиться к БД");
         }
         authService = new DbAuthService();
-        clients = new CopyOnWriteArrayList<>();
+        clients = new ConcurrentHashMap<>();
 
         //netty
         EventLoopGroup boosGroup = new NioEventLoopGroup();
@@ -94,24 +93,28 @@ public class Server {
         }
     }
 
-    public void subscribe(ClientHandler clientHandler){
-        clients.add(clientHandler);
+    public void addClient(String login, String password){
+        clients.put(login, DigestUtils.sha256Hex(password));
     }
 
-    public void unsubscribe(ClientHandler clientHandler){
-        clients.remove(clientHandler);
+    public boolean checkAuthorization(BasicRequest request){
+        return clients.get(request.getLogin()).equals(DigestUtils.sha256Hex(request.getPassword()));
     }
 
-    public boolean isLoginAuthenticated(String login){
+    public void removeClient(String login){
+        if (clients.containsKey(login)){
+            clients.remove(login);
+        }
+    }
+
+    /*public boolean isLoginAuthenticated(String login){
         for (ClientHandler client : clients) {
             if (client.getLogin().equals(login)){
                 return true;
             }
         }
         return false;
-    }
+    }*/
 
-    public AuthService getAuthService() {
-        return authService;
-    }
+
 }

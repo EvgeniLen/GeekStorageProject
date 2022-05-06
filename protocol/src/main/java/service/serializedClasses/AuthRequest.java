@@ -1,20 +1,16 @@
 package service.serializedClasses;
 
-public class AuthRequest implements BasicRequest {
-    private String login;
-    private String password;
-
+public class AuthRequest extends BasicAuth implements BasicRequest {
     public String getLogin() {
-        return login;
+        return super.getLogin();
     }
 
-    public String getPassword() {
-        return password;
+    public  String getPassword() {
+        return super.getPassword();
     }
 
     public AuthRequest(String login, String password) {
-        this.login = login;
-        this.password = password;
+        super(login, password);
     }
 
     @Override

@@ -1,21 +1,15 @@
 package service.serializedClasses;
 
-public class SendFileRequest extends BasicAuth implements BasicRequest {
-    //private FileInfo fileInfo;
-    private final byte[] file;
+
+
+public class MoveFileRequest extends BasicAuth implements BasicRequest{
     private final String serverPath;
     private final String localPath;
 
-    public SendFileRequest(String login, String password, byte[] file, String serverPath, String localPath) {
+    public MoveFileRequest(String login, String password, String serverPath, String localPath) {
         super(login, password);
-        this.file = file;
         this.serverPath = serverPath;
         this.localPath = localPath;
-    }
-
-    @Override
-    public String getType() {
-        return "sendFile";
     }
 
     public String getLogin() {
@@ -26,10 +20,6 @@ public class SendFileRequest extends BasicAuth implements BasicRequest {
         return super.getPassword();
     }
 
-    public byte[] getFile() {
-        return file;
-    }
-
     public String getServerPath() {
         return serverPath;
     }
@@ -37,5 +27,9 @@ public class SendFileRequest extends BasicAuth implements BasicRequest {
     public String getLocalPath() {
         return localPath;
     }
-}
 
+    @Override
+    public String getType() {
+        return "getMoveFile";
+    }
+}

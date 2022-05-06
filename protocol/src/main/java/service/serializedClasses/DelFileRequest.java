@@ -1,13 +1,11 @@
 package service.serializedClasses;
 
-public class UploadFileRequest extends BasicAuth implements BasicRequest{
+public class DelFileRequest extends BasicAuth implements BasicRequest{
     private final String serverPath;
-    private final String localPath;
 
-    public UploadFileRequest(String login, String password, String serverPath, String localPath) {
+    public DelFileRequest(String login, String password, String serverPath) {
         super(login, password);
         this.serverPath = serverPath;
-        this.localPath = localPath;
     }
 
     public String getLogin() {
@@ -22,12 +20,9 @@ public class UploadFileRequest extends BasicAuth implements BasicRequest{
         return serverPath;
     }
 
-    public String getLocalPath() {
-        return localPath;
-    }
 
     @Override
     public String getType() {
-        return "getUploadFile";
+        return "delFile";
     }
 }

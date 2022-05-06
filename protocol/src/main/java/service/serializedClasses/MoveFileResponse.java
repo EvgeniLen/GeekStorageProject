@@ -1,12 +1,12 @@
 package service.serializedClasses;
 
-public class UploadFileResponse extends BasicResponse {
+public class MoveFileResponse extends BasicResponse {
     private final byte[] file;
     private final String serverPath;
     private final String localPath;
 
-    public UploadFileResponse(byte[] file, String serverPath, String localPath) {
-        super("uploadFile");
+    public MoveFileResponse(byte[] file, String serverPath, String localPath) {
+        super("moveFile");
         this.file = file;
         this.serverPath = serverPath;
         this.localPath = localPath;

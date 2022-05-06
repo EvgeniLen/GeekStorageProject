@@ -51,7 +51,6 @@ public class Network {
     }
 
     public void sendRequest(BasicRequest br) {
-
         channel.writeAndFlush(br);
     }
 

@@ -1,11 +1,10 @@
 package service.serializedClasses;
 
 import java.util.List;
-import java.util.Map;
 
 public class GetFileListResponse extends BasicResponse {
-    private String subDirection;
-    private List<FileInfo> files;
+    private final String subDirection;
+    private final List<FileInfo> files;
 
 
 

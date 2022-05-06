@@ -1,20 +1,16 @@
 package service.serializedClasses;
 
-public class RegRequest implements BasicRequest{
-    private String login;
-    private String password;
-
+public class RegRequest extends BasicAuth implements BasicRequest{
     public RegRequest(String login, String password) {
-        this.login = login;
-        this.password = password;
+        super(login, password);
     }
 
     public String getLogin() {
-        return login;
+        return super.getLogin();
     }
 
     public String getPassword() {
-        return password;
+        return super.getPassword();
     }
 
     @Override

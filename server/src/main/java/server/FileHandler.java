@@ -1,9 +1,6 @@
 package server;
 
-import service.serializedClasses.FileInfo;
-import service.serializedClasses.GetFileListRequest;
-import service.serializedClasses.UploadFileRequest;
-import service.serializedClasses.SendFileRequest;
+import service.serializedClasses.*;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -45,8 +42,19 @@ public class FileHandler {
 
     }
 
-    public static byte[] getFile(UploadFileRequest request) {
+    public static byte[] getUploadFile(UploadFileRequest request) {
         Path path = Path.of(DIR, request.getLogin(), request.getServerPath());
+        return getFile(path);
+    }
+
+    public static byte[] getMoveFile(MoveFileRequest request) {
+        Path path = Path.of(DIR, request.getLogin(), request.getServerPath());
+        byte[] file = getFile(path);
+        path.toFile().delete();
+        return file;
+    }
+
+    public static byte[] getFile(Path path){
         try {
             FileInputStream fileInputStream = new FileInputStream(path.toFile());
             byte[] data = new byte[fileInputStream.available()];
@@ -56,6 +64,10 @@ public class FileHandler {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
 
+    public static boolean delFile(DelFileRequest request){
+        Path path = Path.of(DIR, request.getLogin(), request.getServerPath());
+        return path.toFile().delete();
     }
 }

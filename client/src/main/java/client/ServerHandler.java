@@ -8,27 +8,29 @@ import service.serializedClasses.*;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 
 public class ServerHandler extends ChannelInboundHandlerAdapter {
 
     private Controller controller;
 
-
     public ServerHandler(Controller controller) {
         this.controller = controller;
     }
     @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+    public void channelRead(ChannelHandlerContext ctx, Object msg){
         BasicResponse response = (BasicResponse) msg;
-        System.out.println(response.getResponse());
         String responseText = response.getResponse();
-        if (responseText.startsWith(ServiceMessages.AUTH_OK)) {
+        if (responseText.equals(ServiceMessages.AUTH_OK)) {
             controller.setAuthenticated(true);
-
             ctx.writeAndFlush(new GetFileListRequest(controller.getLogin(), controller.getPassword(), ""));
             return;
-        } else if (responseText.startsWith(ServiceMessages.REG_OK)) {
+        } else if (responseText.equals(ServiceMessages.AUTH_NO)) {
+            controller.textArea.appendText("Неверный логин / пароль\n");
+            return;
+        } else if (responseText.startsWith(ServiceMessages.REG_OK) ||
+                    responseText.startsWith(ServiceMessages.REG_NO)) {
             controller.getRegController().regStatus(responseText);
             return;
         } else if ("returnFileList".equals(responseText)) {
@@ -50,9 +52,36 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
             }
             controller.getLocalPC().updateList(Path.of(uploadFileResponse.getLocalPath()).getParent());
             return;
+        } else if ("moveFile".equals(responseText)) {
+            MoveFileResponse moveFileResponse  = (MoveFileResponse ) response;
+
+            try {
+                Path path = Path.of(moveFileResponse.getLocalPath());
+                FileOutputStream fos = new FileOutputStream(path.toString());
+                fos.write(moveFileResponse.getFile());
+                fos.close();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            controller.getLocalPC().updateList(Path.of(moveFileResponse.getLocalPath()).getParent());
+            ctx.writeAndFlush(new GetFileListRequest(controller.getLogin(), controller.getPassword(), getPathWithoutFile(moveFileResponse.getServerPath())));
+            return;
+        } else if ("delFile".equals(responseText)) {
+            ctx.writeAndFlush(new GetFileListRequest(controller.getLogin(), controller.getPassword(), getPathWithoutFile(((DelFileResponse) response).getServerPath())));
+            return;
+        } else if ("sendFile".equals(responseText)) {
+            ctx.writeAndFlush(new GetFileListRequest(controller.getLogin(), controller.getPassword(), getPathWithoutFile(((SendFileResponse) response).getServerPath())));
+            return;
         }
+    }
 
-
+    private String getPathWithoutFile(String path){
+        Path p = Paths.get(path).getParent();
+        if (p != null) {
+            return p.toString();
+        } else {
+            return "";
+        }
     }
 
     @Override
