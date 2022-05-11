@@ -8,14 +8,6 @@ public class GetFileListRequest extends BasicAuth implements BasicRequest {
         this.subDirection = subDirection;
     }
 
-    public String getLogin() {
-        return super.getLogin();
-    }
-
-    public String getPassword() {
-        return super.getPassword();
-    }
-
     public String getSubDirection() {
         return subDirection;
     }

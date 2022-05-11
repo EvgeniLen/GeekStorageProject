@@ -1,16 +1,5 @@
 package client;
 
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.bootstrap.Bootstrap;
-import io.netty.channel.socket.SocketChannel;
-import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.handler.codec.serialization.ClassResolvers;
-import io.netty.handler.codec.serialization.ObjectDecoder;
-import io.netty.handler.codec.serialization.ObjectEncoder;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -29,11 +18,14 @@ import service.serializedClasses.*;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Comparator;
+import java.util.Objects;
 import java.util.ResourceBundle;
 
 public class Controller  implements Initializable{
@@ -56,6 +48,7 @@ public class Controller  implements Initializable{
     private LocalFilePanelController localPC;
     private ServerFilePanelController serverPC;
     private Network network;
+    private final int DIRDEPTH = 6;
 
     public RegController getRegController() {
         return regController;
@@ -159,19 +152,15 @@ public class Controller  implements Initializable{
             //Копировование с локала на сервер
             if (localPC.getSelectedFileName() != null) {
                 Path srcPath = Paths.get(localPC.getCurrentPath(), localPC.getSelectedFileName());
-                Path dstPath = Paths.get(serverPC.getCurrentPath()).resolve(srcPath.getFileName().toString());
-
-                FileInputStream fileInputStream = new FileInputStream(srcPath.toFile());
-                byte[] data = new byte[fileInputStream.available()];
-                fileInputStream.read(data);
-                fileInputStream.close();
-
-                network.sendRequest(new SendFileRequest(login, password, data, dstPath.toString(), srcPath.toString()));
-                network.sendRequest(new GetFileListRequest(login, password, serverPC.getCurrentPath()));
+                copyFiles(srcPath);
             } else if (serverPC.getSelectedFileName() != null) {
                 Path srcPath = Paths.get(serverPC.getCurrentPath().equals(File.separator) ? "": serverPC.getCurrentPath(), serverPC.getSelectedFileName());
-                Path dstPath = Paths.get(localPC.getCurrentPath()).resolve(srcPath.getFileName().toString());
-                network.sendRequest(new UploadFileRequest(login, password, srcPath.toString(), dstPath.toString()));
+                Path dstPath = Paths.get(localPC.getCurrentPath());
+
+                if (checkFile(serverPC.getSelectedFileName(), localPC)) {
+                    network.sendRequest(new UploadFileRequest(login, password, srcPath.toString(), dstPath.toString()));
+                    //localPC.updateList(Paths.get(localPC.getCurrentPath()));
+                }
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -192,24 +181,17 @@ public class Controller  implements Initializable{
             //Перемещение с локала на сервер
             if (localPC.getSelectedFileName() != null) {
                 Path srcPath = Paths.get(localPC.getCurrentPath(), localPC.getSelectedFileName());
-                Path dstPath = Paths.get(serverPC.getCurrentPath()).resolve(srcPath.getFileName().toString());
+                copyFiles(srcPath);
+                deleteFiles(srcPath);
+                localPC.updateList(Paths.get(localPC.getCurrentPath()));
 
-                FileInputStream fileInputStream = new FileInputStream(srcPath.toFile());
-                byte[] data = new byte[fileInputStream.available()];
-                fileInputStream.read(data);
-                fileInputStream.close();
-
-                network.sendRequest(new SendFileRequest(login, password, data, dstPath.toString(), srcPath.toString()));
-                network.sendRequest(new GetFileListRequest(login, password, serverPC.getCurrentPath()));
-                if (srcPath.toFile().delete()){
-                    localPC.updateList(Paths.get(localPC.getCurrentPath()));
-                }
             } else if (serverPC.getSelectedFileName() != null) {
                 Path srcPath = Paths.get(serverPC.getCurrentPath().equals(File.separator) ? "": serverPC.getCurrentPath(), serverPC.getSelectedFileName());
-                Path dstPath = Paths.get(localPC.getCurrentPath()).resolve(srcPath.getFileName().toString());
-                System.out.println(dstPath);
-                network.sendRequest(new MoveFileRequest(login, password, srcPath.toString(), dstPath.toString()));
-                localPC.updateList(Paths.get(localPC.getCurrentPath()));
+                Path dstPath = Paths.get(localPC.getCurrentPath());
+                if (checkFile(serverPC.getSelectedFileName(), localPC)){
+                    network.sendRequest(new MoveFileRequest(login, password, srcPath.toString(), dstPath.toString()));
+                    //localPC.updateList(dstPath);
+                }
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -227,14 +209,63 @@ public class Controller  implements Initializable{
 
         if (localPC.getSelectedFileName() != null) {
             Path srcPath = Paths.get(localPC.getCurrentPath(), localPC.getSelectedFileName());
-            if (srcPath.toFile().delete()){
-                localPC.updateList(Paths.get(localPC.getCurrentPath()));
-            }
+            deleteFiles(srcPath);
+            localPC.updateList(Paths.get(localPC.getCurrentPath()));
         } else if (serverPC.getSelectedFileName() != null) {
             Path srcPath = Paths.get(serverPC.getCurrentPath().equals(File.separator) ? "": serverPC.getCurrentPath(), serverPC.getSelectedFileName());
             network.sendRequest(new DelFileRequest(login, password, srcPath.toString()));
         }
 
+    }
+
+    public boolean checkFile(String name, BasicFilePanelController filePanelController){
+        Alert alert = null;
+        if (filePanelController.isFileExists(name) > 0) {
+            alert = new Alert(Alert.AlertType.CONFIRMATION, String.format("В папке назначения уже есть файл \"%s\", продолжить выполнение?", name), ButtonType.YES, ButtonType.NO);
+            alert.showAndWait();
+        }
+        return alert == null || alert.getResult() == ButtonType.YES;
+    }
+
+    private void copyFiles(Path srcPath) throws IOException {
+        if (checkFile(localPC.getSelectedFileName(), serverPC)) {
+            if (DIRDEPTH - serverPC.getDeep() >= 0) {
+                Files.walk(srcPath, DIRDEPTH - serverPC.getDeep())
+                        //.filter(path -> !path.endsWith(srcPath.getFileName()))
+                        .forEach(path -> {
+                            try {
+                                byte[] data = new byte[0];
+                                if (!path.toFile().isDirectory()) {
+                                    FileInputStream fileInputStream = new FileInputStream(path.toFile());
+                                    data = new byte[fileInputStream.available()];
+                                    fileInputStream.read(data);
+                                    fileInputStream.close();
+                                }
+                                Path dstPath = Paths.get(serverPC.getCurrentPath()).resolve(srcPath.getParent().relativize(path));
+                                //System.out.println("1 + " + dstPath);
+                                network.sendRequest(new SendFileRequest(login, password, data, dstPath.toString(), srcPath.toString(), new FileInfo(path)));
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
+                network.sendRequest(new GetFileListRequest(login, password, serverPC.getCurrentPath()));
+            }
+        }
+    }
+
+    public void deleteFiles(Path path){
+        try {
+            if (Files.isDirectory(path)) {
+                Files.walk(path)
+                        .sorted(Comparator.reverseOrder())
+                        .map(Path::toFile)
+                        .forEach(File::delete);
+            } else {
+                Files.delete(path);
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
 }

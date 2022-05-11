@@ -10,14 +10,6 @@ public class UploadFileRequest extends BasicAuth implements BasicRequest{
         this.localPath = localPath;
     }
 
-    public String getLogin() {
-        return super.getLogin();
-    }
-
-    public String getPassword() {
-        return super.getPassword();
-    }
-
     public String getServerPath() {
         return serverPath;
     }

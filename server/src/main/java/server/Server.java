@@ -102,7 +102,7 @@ public class Server {
     }
 
     public void removeClient(String login){
-        if (clients.containsKey(login)){
+        if (clients.size() > 0 && clients.containsKey(login)){
             clients.remove(login);
         }
     }

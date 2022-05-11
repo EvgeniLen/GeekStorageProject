@@ -8,14 +8,6 @@ public class DelFileRequest extends BasicAuth implements BasicRequest{
         this.serverPath = serverPath;
     }
 
-    public String getLogin() {
-        return super.getLogin();
-    }
-
-    public String getPassword() {
-        return super.getPassword();
-    }
-
     public String getServerPath() {
         return serverPath;
     }

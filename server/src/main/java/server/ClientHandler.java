@@ -28,7 +28,7 @@ public class ClientHandler extends ChannelInboundHandlerAdapter {
     }
 
     @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+    public void channelRead(ChannelHandlerContext ctx, Object msg){
         channel = ctx;
         BasicRequest request = (BasicRequest) msg;
 
@@ -40,7 +40,6 @@ public class ClientHandler extends ChannelInboundHandlerAdapter {
                 sendBasicMsg(ServiceMessages.AUTH_OK);
                 FileHandler.createUserDirectory(login); // создание серверной директории пользователя, если нет
                 server.addClient(login, authRequest.getPassword());
-                //server.subscribe(this);
                 logger.log(Level.INFO, "Client " + login + " authenticated");
             } else {
                 sendBasicMsg(ServiceMessages.AUTH_NO);
@@ -70,19 +69,17 @@ public class ClientHandler extends ChannelInboundHandlerAdapter {
         } else if (request instanceof UploadFileRequest){
             if (server.checkAuthorization(request)){
                 logger.log(Level.FINE, String.format("UploadFile request from %s", (request.getLogin())));
-                byte[] data = FileHandler.getUploadFile((UploadFileRequest)request);
-                channel.writeAndFlush(new UploadFileResponse(data, ((UploadFileRequest) request).getServerPath(), ((UploadFileRequest) request).getLocalPath()));
+                FileHandler.getUploadFile((UploadFileRequest)request, channel);
             }
         } else if (request instanceof MoveFileRequest){
             if (server.checkAuthorization(request)){
                 logger.log(Level.FINE, String.format("MoveFile request from %s", (request.getLogin())));
-                byte[] data = FileHandler.getMoveFile((MoveFileRequest)request);
-                channel.writeAndFlush(new MoveFileResponse(data, ((MoveFileRequest) request).getServerPath(), ((MoveFileRequest) request).getLocalPath()));
+                FileHandler.getMoveFile((MoveFileRequest) request, channel);
             }
         } else if (request instanceof DelFileRequest){
             if (server.checkAuthorization(request)){
                 logger.log(Level.FINE, String.format("DelFile request from %s", (request.getLogin())));
-                if (FileHandler.delFile((DelFileRequest) request)){
+                if (FileHandler.deleteFile((DelFileRequest) request)){
                     channel.writeAndFlush(new DelFileResponse(((DelFileRequest) request).getServerPath()));
                 }
             }

@@ -17,7 +17,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ResourceBundle;
 import java.util.stream.Collectors;
 
-public class LocalFilePanelController implements Initializable {
+public class LocalFilePanelController implements Initializable, BasicFilePanelController {
     public static final String DIR = "ClientDirectory" + File.separator;
     public TableView<FileInfo> filesTable;
     public TextField patchField;
@@ -97,7 +97,7 @@ public class LocalFilePanelController implements Initializable {
     }
 
     public String getSelectedFileName(){
-        if (!filesTable.isFocused()){
+        if (!filesTable.isFocused() || filesTable.getSelectionModel().getSelectedItem() == null){
             return null;
         }
         return filesTable.getSelectionModel().getSelectedItem().getFilename();
@@ -105,5 +105,11 @@ public class LocalFilePanelController implements Initializable {
 
     public String getCurrentPath(){
         return patchField.getText();
+    }
+
+    @Override
+    public int isFileExists(String name) {
+        return filesTable.getItems()
+                .filtered(fileInfo -> fileInfo.getFilename().equals(name)).size();
     }
 }
