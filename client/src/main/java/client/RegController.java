@@ -6,33 +6,32 @@ import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import service.ServiceMessages;
+import service.serializedClasses.RegRequest;
+
 
 public class RegController {
 
     @FXML
     public TextField loginField;
     public PasswordField passwordField;
-    public TextField nicknameField;
     public TextArea textArea;
+    private Network network;
 
-    private Controller controller;
-
-    public void setController(Controller controller) {
-        this.controller = controller;
+    public void setNetwork(Network network) {
+        this.network = network;
     }
 
     public void clickBtnReg(ActionEvent actionEvent) {
         String login = loginField.getText().trim();
         String password = passwordField.getText().trim();
-        String nickname = nicknameField.getText().trim();
-        controller.tryToReg(login, password, nickname);
+        network.sendRequest(new RegRequest(login, password));
     }
 
     public void regStatus(String result){
         if (result.equals(ServiceMessages.REG_OK)){
             textArea.appendText("Регистрация прошла успешно\n");
         } else {
-            textArea.appendText("Регистрация не получилась. Логин или никнейм заняты\n");
+            textArea.appendText("Регистрация не получилась. Логин занят\n");
         }
     }
 

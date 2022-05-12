@@ -1,47 +1,76 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import java.net.URL?>
+<?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
-<?import javafx.scene.control.ListView?>
-<?import javafx.scene.control.MenuButton?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Menu?>
+<?import javafx.scene.control.MenuBar?>
 <?import javafx.scene.control.MenuItem?>
 <?import javafx.scene.control.PasswordField?>
 <?import javafx.scene.control.TextArea?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
 
 <VBox alignment="center" xmlns="http://javafx.com/javafx/8.0.171" xmlns:fx="http://javafx.com/fxml/1" fx:controller="client.Controller">
 
-    <stylesheets>
-        <URL value="@/css/style.css" />
-    </stylesheets>
+    <VBox fx:id="authPanel" alignment="center">
+        <Label alignment="BOTTOM_CENTER" prefHeight="31.0" text="Логин">
+         <font>
+            <Font size="13.0" />
+         </font>
+        </Label>
+        <TextField fx:id="loginField" maxWidth="-Infinity" prefHeight="25.0" prefWidth="420.0" promptText="Логин" HBox.hgrow="ALWAYS" />
+        <Label alignment="BOTTOM_CENTER" prefHeight="31.0" text="Пароль">
+         <font>
+            <Font size="13.0" />
+         </font>
+        </Label>
+        <PasswordField fx:id="passwordField" maxWidth="-Infinity" prefHeight="25.0" prefWidth="420.0" promptText="Пароль" HBox.hgrow="ALWAYS" />
 
-    <HBox fx:id="authPanel">
-        <TextField fx:id="loginField" promptText="login" HBox.hgrow="ALWAYS" />
-        <PasswordField fx:id="passwordField" promptText="password" HBox.hgrow="ALWAYS" />
-        <Button onAction="#clickBtnAuth" text="Auth" />
-        <Button onAction="#clickBtnReg" text="Reg" />
-    </HBox>
+        <HBox alignment="CENTER" spacing="5">
+            <Button onAction="#clickBtnAuth" prefHeight="33.0" prefWidth="165.0" text="Войти">
+                <VBox.margin>
+                    <Insets bottom="5.0" />
+                </VBox.margin>
+            </Button>
+
+            <Button onAction="#clickBtnReg" prefHeight="33.0" prefWidth="165.0" text="Регистрация">
+                <VBox.margin>
+                    <Insets bottom="5.0" />
+                </VBox.margin>
+            </Button>
+         <padding>
+            <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+         </padding>
+        </HBox>
+    </VBox>
 
     <HBox VBox.vgrow="ALWAYS">
         <TextArea fx:id="textArea" editable="false" HBox.hgrow="ALWAYS" />
+    </HBox>
 
-        <VBox>
-            <MenuButton fx:id="menuButton" managed="false" mnemonicParsing="false" text="Menu" visible="false">
-                <items>
-                    <MenuItem mnemonicParsing="false" onAction="#clickChangeName" text="Change nickname" />
-                </items>
-            </MenuButton>
-            <ListView fx:id="clientList" managed="false" minWidth="100" onMouseReleased="#clickClientList" visible="false" />
-        </VBox>
+    <MenuBar fx:id="menuBar">
+        <Menu text="Файл">
+            <MenuItem text="Отключиться" />
+            <MenuItem text="Выход из программы" onAction="#btnExit"/>
+        </Menu>
+    </MenuBar>
 
+    <HBox fx:id="filesPanel">
+        <fx:include fx:id="localPanel" source="localFilePanel.fxml" HBox.hgrow="ALWAYS" />
+        <fx:include fx:id="serverPanel" source="serverFilePanel.fxml" HBox.hgrow="ALWAYS" />
     </HBox>
 
 
-    <HBox fx:id="msgPanel" managed="false" visible="false">
-        <TextField fx:id="textField" onAction="#clickBtnSendText" promptText="input text" HBox.hgrow="ALWAYS" />
-        <Button onAction="#clickBtnSendText" text="Send text" />
+    <HBox fx:id="basicButtonsPanel" spacing="5">
+        <Button maxWidth="Infinity" focusTraversable="false" text="Копировать файл" HBox.hgrow="ALWAYS" onAction="#copyButtonAction"/>
+        <Button maxWidth="Infinity" focusTraversable="false" text="Переместить файл" HBox.hgrow="ALWAYS" />
+        <Button maxWidth="Infinity" focusTraversable="false" text="Удалить файл" HBox.hgrow="ALWAYS" />
+        <padding>
+            <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+        </padding>
     </HBox>
 
 </VBox>

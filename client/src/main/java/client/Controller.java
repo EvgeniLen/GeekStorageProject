@@ -1,228 +1,164 @@
 package client;
 
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.bootstrap.Bootstrap;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.codec.serialization.ClassResolvers;
+import io.netty.handler.codec.serialization.ObjectDecoder;
+import io.netty.handler.codec.serialization.ObjectEncoder;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
-import javafx.event.Event;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
-import service.ServiceMessages;
+import service.serializedClasses.*;
 
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.net.Socket;
 import java.net.URL;
-import java.util.List;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ResourceBundle;
 
-public class Controller implements Initializable {
+public class Controller  implements Initializable{
     @FXML
     public TextArea textArea;
+    public VBox localPanel;
+    public VBox serverPanel;
     public TextField textField;
+    public MenuBar menuBar;
+    public HBox basicButtonsPanel;
+    public HBox basicPanel;
+    public HBox filesPanel;
     public TextField loginField;
     public PasswordField passwordField;
-    public HBox msgPanel;
-    public HBox authPanel;
-    public ListView<String> clientList;
+    public VBox authPanel;
+
     public MenuButton menuButton;
 
-    private Socket socket;
-    private DataInputStream in;
-    private DataOutputStream out;
 
     private final String ADDRESS = "localhost";
-    private final int PORT = 8189;
+    private final int PORT = 45081;
 
-    private boolean authenticated;
+
+    private boolean authenticated = false;
     private String nickname;
     private String login;
-    private String fileNameHistory;
-    private Stage stage;
-    public Stage chStage;
-    public ChangeController chController;
-    public Stage regStage;
-    private RegController regController;
+    private String password;
 
-    public void setNickname(String nickname) {
-        this.nickname = nickname;
+    public Stage regStage;
+
+    public RegController getRegController() {
+        return regController;
     }
+
+    private RegController regController;
+    public static final int MB_20 = 20 * 1_000_000;
+
+    private Channel channel;
+    private Bootstrap bootstrap;
+    private LocalFilePanelController localPC;
+    private ServerFilePanelController serverPC;
 
     public String getNickname() {
         return nickname;
     }
 
+    public LocalFilePanelController getLocalPC() {
+        return localPC;
+    }
+
+    private Network network;
+
+    public ServerFilePanelController getServerPC() {
+        return serverPC;
+    }
+
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        Platform.runLater(() -> {
-            stage = (Stage) textField.getScene().getWindow();
-            stage.setOnCloseRequest(event -> {
-                System.out.println("Bye");
-                if (socket != null && !socket.isClosed()){
-                    try {
-                        out.writeUTF(ServiceMessages.END);
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-            });
-        });
+        network = new Network(this);
         setAuthenticated(false);
     }
 
     public void connect(){
-        try {
-            socket = new Socket(ADDRESS, PORT);
-            in = new DataInputStream(socket.getInputStream());
-            out = new DataOutputStream(socket.getOutputStream());
-
-            new Thread(() -> {
-                try {
-                    //цикл аутентификации
-                    while (true){
-                        String str = in.readUTF();
-                        if (str.startsWith("/")){
-                            if (str.equals(ServiceMessages.END)) {
-                                break;
-                            }
-                            if (str.startsWith(ServiceMessages.AUTH_OK)) {
-                                nickname = str.split("\\s")[1];
-                                setAuthenticated(true);
-                                break;
-                            }
-                            if (str.startsWith(ServiceMessages.REG)){
-                                regController.regStatus(str);
-                            }
-                        } else {
-                            textArea.appendText(str + "\n");
-                        }
+        //Вынести в отдельный класс! отправку сообщений тоже
+            EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
+            try {
+                bootstrap = new Bootstrap();
+                bootstrap.group(eventLoopGroup);
+                bootstrap.channel(NioSocketChannel.class);
+                bootstrap.remoteAddress(ADDRESS, PORT);
+                Controller controller = this;
+                bootstrap.handler(new ChannelInitializer<SocketChannel>() {
+                    @Override
+                    protected void initChannel(SocketChannel socketChannel) {
+                        socketChannel.pipeline().addLast(
+                                new ObjectDecoder(MB_20, ClassResolvers.cacheDisabled(null)),
+                                new ObjectEncoder(),
+                                new ServerHandler(controller)
+                        );
                     }
-                    //цикл работы
-                    while (authenticated){
-                        String str = in.readUTF();
-                        if (str.startsWith("/")){
-                            if (str.equals(ServiceMessages.END)){
-                                setAuthenticated(false);
-                                break;
-                            }
-                            if (str.startsWith(ServiceMessages.ClLIST)){
-                                String[] token = str.split("\\s");
-                                Platform.runLater(() -> {
-                                    clientList.getItems().clear();
-                                    for (int i = 1; i < token.length; i++) {
-                                        clientList.getItems().add(token[i]);
-                                    }
-                                });
-                            }
-                            if (str.startsWith(ServiceMessages.CH_OK)) {
-                                nickname = str.split("\\s")[1];
-                                setTitle(nickname);
-                                chController.changeStatus(str);
-                            } else if (str.startsWith(ServiceMessages.CH_NO)){
-                                chController.changeStatus(str);
-                            }
+                });
+                ChannelFuture channelFuture =  bootstrap.connect().sync();
+                channel = channelFuture.channel();
+                channelFuture.channel().closeFuture();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            } //finally {
+              //  eventLoopGroup.shutdownGracefully();
+           // }
 
-                        } else {
-                            textArea.appendText(str + "\n");
-                            LocalHistory.writeHistory(str);
-                        }
-                    }
-                } catch (IOException e){
-                    e.printStackTrace();
-                } finally {
-                    try {
-                        socket.close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-
-            }).start();
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        //сделать отдельный метод close channel.close
     }
 
     public void clickBtnAuth(ActionEvent actionEvent) {
-        if (socket == null || socket.isClosed()){
-            connect();
-        }
-
-        try {
-            String msg = String.format("%s %s %s", ServiceMessages.AUTH, loginField.getText().trim(), passwordField.getText().trim());
-            out.writeUTF(msg);
-            passwordField.clear();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public void clickBtnSendText(ActionEvent actionEvent) {
-        if (textField.getText().length() > 0){
-            try {
-                out.writeUTF(textField.getText());
-                textField.clear();
-                textField.requestFocus();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-        }
+        network.sendRequest(new AuthRequest(loginField.getText().trim(), passwordField.getText().trim()));
+        login = loginField.getText().trim();
+        //passwordField.clear();
     }
 
     public void setAuthenticated(boolean authenticated) {
         this.authenticated = authenticated;
         authPanel.setVisible(!authenticated);
         authPanel.setManaged(!authenticated);
-        msgPanel.setVisible(authenticated);
-        msgPanel.setManaged(authenticated);
-        clientList.setVisible(authenticated);
-        clientList.setManaged(authenticated);
-        menuButton.setVisible(authenticated);
-        menuButton.setManaged(authenticated);
+        textArea.setVisible(!authenticated);
+        textArea.setManaged(!authenticated);
+        filesPanel.setVisible(authenticated);
+        filesPanel.setManaged(authenticated);
+        menuBar.setVisible(authenticated);
+        menuBar.setManaged(authenticated);
+        basicButtonsPanel.setVisible(authenticated);
+        basicButtonsPanel.setManaged(authenticated);
 
         if (!authenticated) {
             nickname = "";
-            LocalHistory.stop();
         }
 
-        setTitle(nickname);
         textArea.clear();
 
         if (authenticated){
             login = loginField.getText().trim();
-            fileNameHistory = LocalHistory.getFileName(login);
-            textArea.appendText(LocalHistory.getHistory(fileNameHistory));
-            LocalHistory.start(fileNameHistory);
-        }
-    }
+            password = passwordField.getText().trim();
+            localPC = (LocalFilePanelController) localPanel.getProperties().get("ctrl");
 
-    private void setTitle(String nickname) {
-        String title;
-        if (nickname.equals("")){
-            title = "GeekChat";
-        }else {
-            title = String.format("GeekChat - %s", nickname);
+            serverPC = (ServerFilePanelController) serverPanel.getProperties().get("ctrl");
+            serverPC.setController(this);
         }
-        Platform.runLater(() -> {
-            stage.setTitle(title);
-        });
-    }
-
-    public void clickClientList(MouseEvent mouseEvent) {
-        String receiver = clientList.getSelectionModel().getSelectedItem();
-        textField.setText("/w " + receiver + " ");
     }
 
     public void clickBtnReg(ActionEvent actionEvent){
@@ -237,71 +173,77 @@ public class Controller implements Initializable {
             FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/reg.fxml"));
             Parent root = fxmlLoader.load();
             regStage = new Stage();
-            regStage.setTitle("GeekChat registration");
+            regStage.setTitle("GeekStorage - Регистрация нового пользователя");
             regStage.setScene(new Scene(root, 500, 425));
 
             regStage.initModality(Modality.APPLICATION_MODAL);
             regStage.initStyle(StageStyle.UTILITY);
 
             regController = fxmlLoader.getController();
-            regController.setController(this);
+            regController.setNetwork(network);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    public void tryToReg(String login, String password, String nickname){
-        if (socket == null || socket.isClosed()) {
-            connect();
+    public String getLogin() {
+        return login;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void btnExit(ActionEvent actionEvent) {
+        network.close();
+        Platform.exit();
+    }
+
+    public void copyButtonAction(ActionEvent actionEvent) {
+        if (localPC.getSelectedFileName() == null && serverPC.getSelectedFileName() == null) {
+            Alert alert = new Alert(Alert.AlertType.ERROR, "Ни один файл для копирования не выбран", ButtonType.OK);
+            alert.showAndWait();
+            return;
         }
-        String msg = String.format("%s %s %s %s", ServiceMessages.REG, login, password, nickname);
+
+        //Копировование с локала на сервер
         try {
-            out.writeUTF(msg);
+            //Копировование с локала на сервер
+            if (localPC.getSelectedFileName() != null) {
+                LocalFilePanelController srcPC = null;
+                ServerFilePanelController dstPC = null;
+                srcPC = localPC;
+                dstPC = serverPC;
+                Path srcPath = Paths.get(srcPC.getCurrentPath(), srcPC.getSelectedFileName());
+                Path dstPath = Paths.get(dstPC.getCurrentPath()).resolve(srcPath.getFileName().toString());
+
+                FileInputStream fileInputStream = new FileInputStream(srcPath.toFile());
+                byte[] data = new byte[fileInputStream.available()];
+                fileInputStream.read(data);
+                fileInputStream.close();
+                network.sendRequest(new SendFileRequest(login, password, data, dstPath.toString(), srcPath.toString()));
+                network.sendRequest(new GetFileListRequest(login, password, dstPC.getCurrentPath()));
+            } else if (serverPC.getSelectedFileName() != null) {
+                ServerFilePanelController srcPC = null;
+                LocalFilePanelController dstPC = null;
+                srcPC = serverPC;
+                dstPC = localPC;
+                System.out.println(srcPC.getCurrentPath());
+                System.out.println(srcPC.getSelectedFileName());
+                Path srcPath = Paths.get(srcPC.getCurrentPath().equals(File.separator) ? "": srcPC.getCurrentPath(), srcPC.getSelectedFileName());
+                Path dstPath = Paths.get(dstPC.getCurrentPath()).resolve(srcPath.getFileName().toString());
+                System.out.println(dstPath);
+                network.sendRequest(new UploadFileRequest(login, password, srcPath.toString(), dstPath.toString()));
+            }
         } catch (IOException e) {
             e.printStackTrace();
+            Alert alert = new Alert(Alert.AlertType.ERROR, "Не удалось скопировать указанный файл", ButtonType.OK);
+            alert.showAndWait();
         }
+
     }
 
-    public void tryToChange(String newNickname){
-        if (socket == null || socket.isClosed()) {
-            connect();
-        }
-        String msg = String.format("%s %s", ServiceMessages.CH_NICK, newNickname);
-        try {
-            out.writeUTF(msg);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void createChangeNicknameWindow(){
-        try {
-            FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/changeNickname.fxml"));
-            Parent root = fxmlLoader.load();
-            chStage = new Stage();
-            chStage.setTitle("GeekChat change nickname");
-            chStage.setScene(new Scene(root, 500, 425));
-
-            chStage.initModality(Modality.APPLICATION_MODAL);
-            chStage.initStyle(StageStyle.UTILITY);
-
-            chController = fxmlLoader.getController();
-            chController.setController(this);
-            chController.oldNickname.setText(nickname);
-            chController.oldNickname.setEditable(false);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public void clickChangeName(Event event) {
-        if (chStage == null) {
-            createChangeNicknameWindow();
-        } else {
-            chController.newNickname.clear();
-            chController.textArea.clear();
-        }
-        chController.newNickname.requestFocus();
-        chStage.show();
+    public Network getNetwork() {
+        return network;
     }
 }

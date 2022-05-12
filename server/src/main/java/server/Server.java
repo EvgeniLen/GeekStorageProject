@@ -1,11 +1,23 @@
 package server;
 
+import io.netty.bootstrap.ServerBootstrap;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.serialization.ClassResolvers;
+import io.netty.handler.codec.serialization.ObjectDecoder;
+import io.netty.handler.codec.serialization.ObjectEncoder;
 import service.ServiceMessages;
 
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
@@ -16,9 +28,13 @@ import java.util.logging.Logger;
 
 public class Server {
     private static final Logger logger = Logger.getLogger(Server.class.getName());
-    private static ServerSocket server;
-    private static Socket socket;
-    private static final int PORT = 8189;
+
+
+
+    private final List<Channel> channels = new ArrayList<>();
+    private static final int PORT = 45081;
+
+    private static final int MB_20 = 20 * 1_000_000;
 
     static {
         LogManager manager = LogManager.getLogManager();
@@ -32,70 +48,58 @@ public class Server {
     private List<ClientHandler> clients;
     private AuthService authService;
 
+    public List<Channel> getChannels() {
+        return channels;
+    }
+
     public Server() {
         if (!SQLHandler.connect()) {
             throw new RuntimeException("Не удалось подключиться к БД");
         }
         authService = new DbAuthService();
         clients = new CopyOnWriteArrayList<>();
-        ExecutorService es = Executors.newCachedThreadPool();
+
+        //netty
+        EventLoopGroup boosGroup = new NioEventLoopGroup();
+        EventLoopGroup workerGroup = new NioEventLoopGroup();
 
         try {
-            server = new ServerSocket(PORT);
-            logger.log(Level.INFO, "Server started!");
-            //System.out.println("Server started!");
+            Server server = this;
+            ServerBootstrap serverBootstrap = new ServerBootstrap();
+            serverBootstrap.group(boosGroup, workerGroup)
+                    .channel(NioServerSocketChannel.class)
+                    .childHandler(new ChannelInitializer<SocketChannel>() {
+                        @Override
+                        protected void initChannel(SocketChannel socketChannel) {
 
-            while (true) {
-                socket = server.accept();
-                logger.log(Level.INFO, "Client connected: " + socket.getRemoteSocketAddress());
-                //System.out.println("Client connected: " + socket.getRemoteSocketAddress());
-                new ClientHandler(this, socket, es);
-            }
+                            socketChannel.pipeline()
+                                    .addLast(
+                                            new ObjectDecoder(MB_20, ClassResolvers.cacheDisabled(null)),
+                                            new ObjectEncoder(),
+                                            new ClientHandler(server)
+                                    );
+                        }
+                    });
+            ChannelFuture channelFuture = serverBootstrap.bind(PORT).sync();
+            channelFuture.channel().closeFuture().sync();
 
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         } finally {
             SQLHandler.disconnect();
-            es.shutdown();
             logger.log(Level.SEVERE, "Server stop");
-            //System.out.println("Server stop");
-            try {
-                server.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+
+            workerGroup.shutdownGracefully();
+            boosGroup.shutdownGracefully();
         }
     }
 
     public void subscribe(ClientHandler clientHandler){
         clients.add(clientHandler);
-        broadcastClientList();
     }
 
     public void unsubscribe(ClientHandler clientHandler){
         clients.remove(clientHandler);
-        broadcastClientList();
-    }
-
-    public void broadcastMsg(ClientHandler sender, String msg){
-        String message = String.format("[ %s ]: %s", sender.getNickname(), msg);
-        for (ClientHandler c : clients) {
-            c.sendMsg(message);
-        }
-    }
-
-    public void sendPrivateMsg(ClientHandler sender, String receiver, String msg) {
-        String message = String.format("[ %s ] to [ %s ]: %s", sender.getNickname(), receiver, msg);
-        for (ClientHandler c : clients) {
-            if (c.getNickname().equals(receiver)) {
-                c.sendMsg(message);
-                if (!sender.getNickname().equals(receiver)) {
-                    sender.sendMsg(message);
-                }
-                return;
-            }
-        }
-        sender.sendMsg("not found user: " + receiver);
     }
 
     public boolean isLoginAuthenticated(String login){
@@ -105,19 +109,6 @@ public class Server {
             }
         }
         return false;
-    }
-
-    public void broadcastClientList(){
-        StringBuilder sb = new StringBuilder(ServiceMessages.ClLIST);
-        for (ClientHandler client : clients) {
-            sb.append(" ").append(client.getNickname());
-        }
-
-        String message = sb.toString();
-
-        for (ClientHandler client : clients) {
-            client.sendMsg(message);
-        }
     }
 
     public AuthService getAuthService() {
