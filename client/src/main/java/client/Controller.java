@@ -1,6 +1,8 @@
 package client;
 
 import javafx.application.Platform;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -17,18 +19,20 @@ import service.serializedClasses.*;
 
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.net.URL;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
-import java.util.Objects;
 import java.util.ResourceBundle;
 
 public class Controller  implements Initializable{
+    private static final int MB_5 = 5 * 1_000_000;
     @FXML
     public TextArea textArea;
     public VBox localPanel;
@@ -40,7 +44,6 @@ public class Controller  implements Initializable{
     public PasswordField passwordField;
     public VBox authPanel;
 
-    private boolean authenticated = false;
     private String login;
     private String password;
     public Stage regStage;
@@ -48,7 +51,11 @@ public class Controller  implements Initializable{
     private LocalFilePanelController localPC;
     private ServerFilePanelController serverPC;
     private Network network;
-    private final int DIRDEPTH = 6;
+    private int maxDepth;
+
+    public void setMaxDepth(int maxDepth) {
+        this.maxDepth = maxDepth;
+    }
 
     public RegController getRegController() {
         return regController;
@@ -79,7 +86,6 @@ public class Controller  implements Initializable{
     }
 
     public void setAuthenticated(boolean authenticated) {
-        this.authenticated = authenticated;
         authPanel.setVisible(!authenticated);
         authPanel.setManaged(!authenticated);
         textArea.setVisible(!authenticated);
@@ -110,6 +116,18 @@ public class Controller  implements Initializable{
         regStage.show();
     }
 
+    public void btnExit(ActionEvent actionEvent) {
+        network.close();
+        Platform.exit();
+    }
+
+    public void btnLogOut(ActionEvent actionEvent) {
+        loginField.clear();
+        passwordField.clear();
+        network.sendRequest(new LogOutRequest(login, password));
+        setAuthenticated(false);
+    }
+
     private void createRegWindow(){
         try {
             FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/reg.fxml"));
@@ -136,15 +154,9 @@ public class Controller  implements Initializable{
         return password;
     }
 
-    public void btnExit(ActionEvent actionEvent) {
-        network.close();
-        Platform.exit();
-    }
-
     public void copyButtonAction(ActionEvent actionEvent) {
         if (localPC.getSelectedFileName() == null && serverPC.getSelectedFileName() == null) {
-            Alert alert = new Alert(Alert.AlertType.ERROR, "Ни один файл для копирования не выбран", ButtonType.OK);
-            alert.showAndWait();
+            getAlert("Ни один файл для копирования не выбран.");
             return;
         }
 
@@ -159,21 +171,18 @@ public class Controller  implements Initializable{
 
                 if (checkFile(serverPC.getSelectedFileName(), localPC)) {
                     network.sendRequest(new UploadFileRequest(login, password, srcPath.toString(), dstPath.toString()));
-                    //localPC.updateList(Paths.get(localPC.getCurrentPath()));
                 }
             }
         } catch (IOException e) {
             e.printStackTrace();
-            Alert alert = new Alert(Alert.AlertType.ERROR, "Не удалось скопировать указанный файл", ButtonType.OK);
-            alert.showAndWait();
+            getAlert("Не удалось скопировать указанный файл.");
         }
 
     }
 
     public void moveButtonAction(ActionEvent actionEvent) {
         if (localPC.getSelectedFileName() == null && serverPC.getSelectedFileName() == null) {
-            Alert alert = new Alert(Alert.AlertType.ERROR, "Ни один файл для перемещения не выбран", ButtonType.OK);
-            alert.showAndWait();
+            getAlert("Ни один файл для перемещения не выбран.");
             return;
         }
 
@@ -190,20 +199,17 @@ public class Controller  implements Initializable{
                 Path dstPath = Paths.get(localPC.getCurrentPath());
                 if (checkFile(serverPC.getSelectedFileName(), localPC)){
                     network.sendRequest(new MoveFileRequest(login, password, srcPath.toString(), dstPath.toString()));
-                    //localPC.updateList(dstPath);
                 }
             }
         } catch (IOException e) {
             e.printStackTrace();
-            Alert alert = new Alert(Alert.AlertType.ERROR, "Не удалось скопировать указанный файл", ButtonType.OK);
-            alert.showAndWait();
+            getAlert("Не удалось переместить указанный файл.");
         }
     }
 
     public void delButtonAction(ActionEvent actionEvent) {
         if (localPC.getSelectedFileName() == null && serverPC.getSelectedFileName() == null) {
-            Alert alert = new Alert(Alert.AlertType.ERROR, "Ни один файл для удаления не выбран", ButtonType.OK);
-            alert.showAndWait();
+            getAlert("Ни один файл для удаления не выбран.");
             return;
         }
 
@@ -227,23 +233,39 @@ public class Controller  implements Initializable{
         return alert == null || alert.getResult() == ButtonType.YES;
     }
 
+    public void getAlertQuota(){
+        Platform.runLater(() -> getAlert("На серверном хранилищие превышена квота, отправка файлов невозможна. Удалите ненужные файлы."));
+    }
+
+    public void getAlert(String text) {
+        Alert alert = new Alert(Alert.AlertType.ERROR, text, ButtonType.OK);
+        alert.showAndWait();
+    }
+
     private void copyFiles(Path srcPath) throws IOException {
         if (checkFile(localPC.getSelectedFileName(), serverPC)) {
-            if (DIRDEPTH - serverPC.getDeep() >= 0) {
-                Files.walk(srcPath, DIRDEPTH - serverPC.getDeep())
-                        //.filter(path -> !path.endsWith(srcPath.getFileName()))
+            if (maxDepth - serverPC.getDepth() >= 0) {
+                Files.walk(srcPath, maxDepth - serverPC.getDepth())
                         .forEach(path -> {
+                            byte[] bytes = new byte[0];
+                            Path dstPath = Paths.get(serverPC.getCurrentPath()).resolve(srcPath.getParent().relativize(path));
                             try {
-                                byte[] data = new byte[0];
                                 if (!path.toFile().isDirectory()) {
-                                    FileInputStream fileInputStream = new FileInputStream(path.toFile());
-                                    data = new byte[fileInputStream.available()];
-                                    fileInputStream.read(data);
-                                    fileInputStream.close();
+                                    RandomAccessFile fileForSend = new RandomAccessFile(path.toFile(), "rw");
+                                    ByteBuffer byteBuffer = ByteBuffer.allocate(MB_5);
+                                    FileChannel fileChannel = fileForSend.getChannel();
+
+                                    while (fileChannel.read(byteBuffer) != -1){
+                                        byteBuffer.flip();
+                                        bytes = new byte[byteBuffer.remaining()];
+                                        byteBuffer.get(bytes);
+                                        network.sendRequest(new SendFileRequest(login, password, bytes, dstPath.toString(), new FileInfo(path)));
+                                        byteBuffer.clear();
+                                    }
+                                    fileForSend.close();
+                                } else {
+                                    network.sendRequest(new SendFileRequest(login, password, bytes, dstPath.toString(), new FileInfo(path)));
                                 }
-                                Path dstPath = Paths.get(serverPC.getCurrentPath()).resolve(srcPath.getParent().relativize(path));
-                                //System.out.println("1 + " + dstPath);
-                                network.sendRequest(new SendFileRequest(login, password, data, dstPath.toString(), srcPath.toString(), new FileInfo(path)));
                             } catch (IOException e) {
                                 throw new RuntimeException(e);
                             }
@@ -264,7 +286,8 @@ public class Controller  implements Initializable{
                 Files.delete(path);
             }
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            e.printStackTrace();
+            getAlert("Нe удалось удалить указанный файл.");
         }
     }
 

@@ -1,6 +1,6 @@
 package service.serializedClasses;
 
-public class UploadFileRequest extends BasicAuth implements BasicRequest{
+public class UploadFileRequest extends BasicAuth implements BasicRequest, BasicFileRequest{
     private final String serverPath;
     private final String localPath;
 

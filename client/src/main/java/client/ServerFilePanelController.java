@@ -38,7 +38,7 @@ public class ServerFilePanelController implements Initializable, BasicFilePanelC
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        //Заполняем локальную таблицу
+        //Заполняем серверную таблицу
         TableColumn<FileInfo, String> fileTypeColumn = new TableColumn<>();
         fileTypeColumn.setCellValueFactory(param -> new SimpleStringProperty(param.getValue().getType().getName()));
         fileTypeColumn.setMaxWidth(24);
@@ -116,7 +116,7 @@ public class ServerFilePanelController implements Initializable, BasicFilePanelC
         return patchField.getText();
     }
 
-    public int getDeep() {
+    public int getDepth() {
         return depth;
     }
 

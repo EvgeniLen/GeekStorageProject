@@ -1,15 +1,13 @@
 package service.serializedClasses;
 
-public class MoveFileResponse extends BasicResponse {
+public class FileResponse extends BasicResponse {
     private final FileInfo fileInfo;
     private final byte[] file;
-    private final String serverPath;
     private final String localPath;
 
-    public MoveFileResponse(byte[] file, String serverPath, String localPath, FileInfo fileInfo) {
-        super("moveFile");
+    public FileResponse(String typeResponse, byte[] file, String localPath, FileInfo fileInfo) {
+        super(typeResponse);
         this.file = file;
-        this.serverPath = serverPath;
         this.localPath = localPath;
         this.fileInfo = fileInfo;
     }

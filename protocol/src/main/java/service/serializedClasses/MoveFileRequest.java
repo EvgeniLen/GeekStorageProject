@@ -2,7 +2,7 @@ package service.serializedClasses;
 
 
 
-public class MoveFileRequest extends BasicAuth implements BasicRequest{
+public class MoveFileRequest extends BasicAuth implements BasicRequest, BasicFileRequest{
     private final String serverPath;
     private final String localPath;
 

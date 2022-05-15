@@ -1,7 +1,6 @@
 package server;
 
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.EventLoopGroup;
@@ -12,16 +11,13 @@ import io.netty.handler.codec.serialization.ClassResolvers;
 import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.codec.serialization.ObjectEncoder;
 import org.apache.commons.codec.digest.DigestUtils;
-import service.serializedClasses.AuthRequest;
 import service.serializedClasses.BasicRequest;
 
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
@@ -30,6 +26,7 @@ public class Server {
     private static final Logger logger = Logger.getLogger(Server.class.getName());
     private static final int PORT = 45081;
     private static final int MB_20 = 20 * 1_000_000;
+    private static Map<String, Long> confMap;
 
     static {
         LogManager manager = LogManager.getLogManager();
@@ -41,14 +38,15 @@ public class Server {
     }
 
     private final Map<String, String> clients;
-    private final AuthService authService;
 
-    public Map<String, String> getClients() {
-        return clients;
-    }
+    private final AuthService authService;
 
     public AuthService getAuthService() {
         return authService;
+    }
+
+    public static long getConf(String conf) {
+        return confMap.get(conf);
     }
 
     public Server() {
@@ -57,8 +55,9 @@ public class Server {
         }
         authService = new DbAuthService();
         clients = new ConcurrentHashMap<>();
+        confMap = new HashMap<>();
+        confMap = authService.getConfiguration();
 
-        //netty
         EventLoopGroup boosGroup = new NioEventLoopGroup();
         EventLoopGroup workerGroup = new NioEventLoopGroup();
 
@@ -102,19 +101,14 @@ public class Server {
     }
 
     public void removeClient(String login){
-        if (clients.size() > 0 && clients.containsKey(login)){
+        if (clients.size() > 0){
             clients.remove(login);
         }
     }
 
-    /*public boolean isLoginAuthenticated(String login){
-        for (ClientHandler client : clients) {
-            if (client.getLogin().equals(login)){
-                return true;
-            }
-        }
-        return false;
-    }*/
+    public boolean isLoginAuthenticated(String login){
+        return clients.containsKey(login);
+    }
 
 
 }

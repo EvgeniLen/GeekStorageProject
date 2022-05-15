@@ -1,10 +1,13 @@
 package server;
 
 import java.sql.*;
+import java.util.HashMap;
+import java.util.Map;
 
 public class SQLHandler {
     private static Connection connection;
     private static PreparedStatement prInsert;
+    private static PreparedStatement prSelectConf;
     private static PreparedStatement prSelectNickAndLogin;
 
 
@@ -39,6 +42,7 @@ public class SQLHandler {
     private static void prepareAllStatement() throws SQLException {
         prSelectNickAndLogin = connection.prepareStatement("SELECT login FROM users WHERE login = ? AND password = ?");
         prInsert = connection.prepareStatement("INSERT INTO users (login, password) VALUES (?, ?)");
+        prSelectConf = connection.prepareStatement("SELECT conf_type, value FROM configurations");
     }
 
     public static boolean getAutentificationResult(String login, String password) {
@@ -69,4 +73,18 @@ public class SQLHandler {
         }
     }
 
+    public static Map<String, Long> getConfiguration() {
+        Map<String, Long> map = new HashMap<>();
+        try {
+            ResultSet result = prSelectConf.executeQuery();
+
+            while (result.next()){
+                map.put(result.getString("conf_type"), result.getLong("value"));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+
+        return map;
+    }
 }
