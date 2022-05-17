@@ -1,5 +1,7 @@
 package server;
 
+import server.handlers.SQLHandler;
+
 import java.util.Map;
 
 public class DbAuthService implements AuthService{

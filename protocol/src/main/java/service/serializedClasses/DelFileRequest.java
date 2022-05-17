@@ -15,6 +15,6 @@ public class DelFileRequest extends BasicAuth implements BasicRequest{
 
     @Override
     public String getType() {
-        return "delFile";
+        return "deleteFile";
     }
 }
