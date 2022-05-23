@@ -1,24 +1,11 @@
 package service.serializedClasses;
 
-public class GetFileListRequest implements BasicRequest {
-    private String login;
-    private String password;
-    private String subDirection;
-
-
+public class GetFileListRequest extends BasicAuth implements BasicRequest {
+    private final String subDirection;
 
     public GetFileListRequest(String login, String password, String subDirection) {
-        this.login = login;
-        this.password = password;
+        super(login, password);
         this.subDirection = subDirection;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public String getLogin() {
-        return login;
     }
 
     public String getSubDirection() {

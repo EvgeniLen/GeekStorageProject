@@ -1,5 +1,7 @@
 package server;
 
+import java.util.Map;
+
 public interface AuthService {
     /**
      * Результат аутентификации
@@ -14,5 +16,11 @@ public interface AuthService {
      * иначе вернет false
      * */
     boolean registration(String login, String password);
+
+    /**
+     * Получить настройки из базы
+     * возвращает map, ключ - значение
+     * */
+    Map<String, Long> getConfiguration();
 
 }

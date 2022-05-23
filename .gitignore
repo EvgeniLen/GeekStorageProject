@@ -2,3 +2,7 @@
 /client/target/
 /protocol/target/
 /server/target/
+/.idea/
+/ClientDirectory/
+/ServerDirectory/
+/*.log

@@ -1,10 +1,12 @@
 package service.serializedClasses;
 
-public class UploadFileRequest extends BasicAuth implements BasicRequest, BasicFileRequest{
+
+
+public class MoveFileRequest extends BasicAuth implements BasicRequest, BasicFileRequest{
     private final String serverPath;
     private final String localPath;
 
-    public UploadFileRequest(String login, String password, String serverPath, String localPath) {
+    public MoveFileRequest(String login, String password, String serverPath, String localPath) {
         super(login, password);
         this.serverPath = serverPath;
         this.localPath = localPath;
@@ -20,6 +22,6 @@ public class UploadFileRequest extends BasicAuth implements BasicRequest, BasicF
 
     @Override
     public String getType() {
-        return "getUploadFile";
+        return "getMoveFile";
     }
 }

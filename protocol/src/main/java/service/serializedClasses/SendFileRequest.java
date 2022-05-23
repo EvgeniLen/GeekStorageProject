@@ -1,36 +1,21 @@
 package service.serializedClasses;
 
 
-import java.nio.file.Path;
+public class SendFileRequest extends BasicAuth implements BasicRequest {
+    private final FileInfo fileInfo;
+    private final byte[] file;
+    private final String serverPath;
 
-public class SendFileRequest implements BasicRequest {
-    private String login;
-    private String password;
-    //private FileInfo fileInfo;
-    private byte[] file;
-
-    private String serverPath;
-    private String localPath;
-
-    public SendFileRequest(String login, String password, byte[] file, String serverPath, String localPath) {
-        this.login = login;
-        this.password = password;
+    public SendFileRequest(String login, String password, byte[] file, String serverPath, FileInfo fileInfo) {
+        super(login, password);
         this.file = file;
         this.serverPath = serverPath;
-        this.localPath = localPath;
+        this.fileInfo = fileInfo;
     }
 
     @Override
     public String getType() {
         return "sendFile";
-    }
-
-    public String getLogin() {
-        return login;
-    }
-
-    public String getPassword() {
-        return password;
     }
 
     public byte[] getFile() {
@@ -41,8 +26,8 @@ public class SendFileRequest implements BasicRequest {
         return serverPath;
     }
 
-    public String getLocalPath() {
-        return localPath;
+    public FileInfo getFileInfo() {
+        return fileInfo;
     }
 }
 

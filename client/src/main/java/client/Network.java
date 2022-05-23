@@ -40,18 +40,17 @@ public class Network {
                 });
                 ChannelFuture channelFuture =  bootstrap.connect().sync();
                 channel = channelFuture.channel();
-                channelFuture.channel().closeFuture();
+                channelFuture.channel().closeFuture().sync();
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
-            } //finally {
-             // eventLoopGroup.shutdownGracefully();
-             //}
+            } finally {
+              eventLoopGroup.shutdownGracefully();
+             }
         }).start();
 
     }
 
     public void sendRequest(BasicRequest br) {
-
         channel.writeAndFlush(br);
     }
 

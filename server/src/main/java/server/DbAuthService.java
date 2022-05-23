@@ -1,5 +1,7 @@
 package server;
 
+import java.util.Map;
+
 public class DbAuthService implements AuthService{
 
     @Override
@@ -12,5 +14,8 @@ public class DbAuthService implements AuthService{
        return SQLHandler.registration(login, password);
     }
 
-
+    @Override
+    public Map<String, Long> getConfiguration() {
+        return SQLHandler.getConfiguration();
+    }
 }

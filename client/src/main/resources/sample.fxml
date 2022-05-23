@@ -53,7 +53,7 @@
 
     <MenuBar fx:id="menuBar">
         <Menu text="Файл">
-            <MenuItem text="Отключиться" />
+            <MenuItem text="Отключиться" onAction="#btnLogOut"/>
             <MenuItem text="Выход из программы" onAction="#btnExit"/>
         </Menu>
     </MenuBar>
@@ -66,8 +66,8 @@
 
     <HBox fx:id="basicButtonsPanel" spacing="5">
         <Button maxWidth="Infinity" focusTraversable="false" text="Копировать файл" HBox.hgrow="ALWAYS" onAction="#copyButtonAction"/>
-        <Button maxWidth="Infinity" focusTraversable="false" text="Переместить файл" HBox.hgrow="ALWAYS" />
-        <Button maxWidth="Infinity" focusTraversable="false" text="Удалить файл" HBox.hgrow="ALWAYS" />
+        <Button maxWidth="Infinity" focusTraversable="false" text="Переместить файл" HBox.hgrow="ALWAYS" onAction="#moveButtonAction"/>
+        <Button maxWidth="Infinity" focusTraversable="false" text="Удалить файл" HBox.hgrow="ALWAYS" onAction="#delButtonAction"/>
         <padding>
             <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
         </padding>

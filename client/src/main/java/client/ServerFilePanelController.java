@@ -8,7 +8,6 @@ import javafx.fxml.Initializable;
 import javafx.scene.control.*;
 import service.serializedClasses.FileInfo;
 import service.serializedClasses.GetFileListRequest;
-import service.serializedClasses.SendFileRequest;
 
 import java.io.File;
 import java.net.URL;
@@ -18,7 +17,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.ResourceBundle;
 
-public class ServerFilePanelController implements Initializable {
+public class ServerFilePanelController implements Initializable, BasicFilePanelController {
     @FXML
     public TableView<FileInfo> filesTable;
     @FXML
@@ -26,6 +25,8 @@ public class ServerFilePanelController implements Initializable {
 
     private Controller controller;
     private Network network;
+
+    private int depth = 0;
 
     public void setController(Controller controller) {
         this.controller = controller;
@@ -37,7 +38,7 @@ public class ServerFilePanelController implements Initializable {
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        //Заполняем локальную таблицу
+        //Заполняем серверную таблицу
         TableColumn<FileInfo, String> fileTypeColumn = new TableColumn<>();
         fileTypeColumn.setCellValueFactory(param -> new SimpleStringProperty(param.getValue().getType().getName()));
         fileTypeColumn.setMaxWidth(24);
@@ -76,8 +77,9 @@ public class ServerFilePanelController implements Initializable {
 
         filesTable.setOnMouseClicked(mouseEvent -> {
             if(mouseEvent.getClickCount() == 2){
-                String dir = patchField.getText() + filesTable.getSelectionModel().getSelectedItem().getFilename();
+                String dir = (patchField.getText().endsWith("\\") ? patchField.getText(): patchField.getText() + File.separator) + filesTable.getSelectionModel().getSelectedItem().getFilename();
                 if (filesTable.getSelectionModel().getSelectedItem().getType().getName().equals("D")){
+                    depth++;
                     network.sendRequest(new GetFileListRequest(controller.getLogin(), controller.getPassword(), dir));
                 }
             }
@@ -97,13 +99,14 @@ public class ServerFilePanelController implements Initializable {
     public void patchUpAction(ActionEvent actionEvent) {
         Path upperPatch = Paths.get(patchField.getText()).getParent();
         if (upperPatch != null) {
+            depth--;
             network.sendRequest(new GetFileListRequest(controller.getLogin(), controller.getPassword(), upperPatch.toString()));
         }
 
     }
 
     public String getSelectedFileName(){
-        if (!filesTable.isFocused()){
+        if (!filesTable.isFocused() || filesTable.getSelectionModel().getSelectedItem() == null){
             return null;
         }
         return filesTable.getSelectionModel().getSelectedItem().getFilename();
@@ -111,5 +114,15 @@ public class ServerFilePanelController implements Initializable {
 
     public String getCurrentPath(){
         return patchField.getText();
+    }
+
+    public int getDepth() {
+        return depth;
+    }
+
+    public int isFileExists(String name){
+        return filesTable.getItems()
+                .filtered(fileInfo -> fileInfo.getFilename().equals(name))
+                .size();
     }
 }

@@ -21,6 +21,7 @@ public class FileInfo implements Serializable {
         }
     }
 
+    private Byte[] file;
     private String filename;
     private FileType type;
     private long size;
@@ -30,33 +31,21 @@ public class FileInfo implements Serializable {
         return filename;
     }
 
-    public void setFilename(String filename) {
-        this.filename = filename;
-    }
 
     public FileType getType() {
         return type;
     }
 
-    public void setType(FileType type) {
-        this.type = type;
-    }
 
     public long getSize() {
         return size;
     }
 
-    public void setSize(long size) {
-        this.size = size;
-    }
 
     public LocalDateTime getLastModified() {
         return lastModified;
     }
 
-    public void setLastModified(LocalDateTime lastModified) {
-        this.lastModified = lastModified;
-    }
 
     public FileInfo(Path path) {
         try {
