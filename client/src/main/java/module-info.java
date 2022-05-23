@@ -8,5 +8,7 @@ module client {
 
     opens client to javafx.fxml;
     exports client;
+    exports client.filePanels;
+    opens client.filePanels to javafx.fxml;
 
 }

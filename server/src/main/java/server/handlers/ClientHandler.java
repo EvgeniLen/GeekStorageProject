@@ -1,8 +1,9 @@
-package server;
+package server.handlers;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import org.apache.commons.codec.digest.DigestUtils;
+import server.Server;
 import service.ServiceMessages;
 import service.serializedClasses.*;
 
@@ -41,7 +42,7 @@ public class ClientHandler extends ChannelInboundHandlerAdapter {
             if (server.getAuthService().getAutentificationResult(login, DigestUtils.sha256Hex(authRequest.getPassword()))) {
                 if (!server.isLoginAuthenticated(login)){
                     sendBasicMsg(ServiceMessages.AUTH_OK);
-                    sendBasicMsg(String.format("%s:%d", ServiceMessages.CONF_MAXDEPTH, Server.getConf("maxDepth")));
+                    sendBasicMsg(String.format("%s:%d", ServiceMessages.CONF_MAX_DEPTH, Server.getConf("maxDepth")));
                     fileHandler.createUserDirectory(login); // создание серверной директории пользователя, если нет
                     server.addClient(login, authRequest.getPassword());
                     logger.log(Level.INFO, "Client " + login + " authenticated");
@@ -78,19 +79,19 @@ public class ClientHandler extends ChannelInboundHandlerAdapter {
         } else if (request instanceof UploadFileRequest){
             if (server.checkAuthorization(request)){
                 logger.log(Level.FINE, String.format("UploadFile request from %s", (request.getLogin())));
-                fileHandler.sendFileToLocal((UploadFileRequest)request, channel, "uploadFile");
+                fileHandler.sendFileToLocal((UploadFileRequest)request, channel, ServiceMessages.UPLOAD_FILE);
             }
         } else if (request instanceof MoveFileRequest){
             if (server.checkAuthorization(request)){
                 logger.log(Level.FINE, String.format("MoveFile request from %s", (request.getLogin())));
-                fileHandler.sendFileToLocal((MoveFileRequest)request, channel, "moveFile");
+                fileHandler.sendFileToLocal((MoveFileRequest)request, channel, ServiceMessages.MOVE_FILE);
                 fileHandler.deleteFiles(request.getLogin(), ((MoveFileRequest) request).getServerPath());
             }
         } else if (request instanceof DelFileRequest){
             if (server.checkAuthorization(request)){
                 logger.log(Level.FINE, String.format("DelFile request from %s", (request.getLogin())));
                 if (fileHandler.deleteFiles(request.getLogin(), ((DelFileRequest) request).getServerPath())){
-                    sendBasicMsg("delFile");
+                    sendBasicMsg(ServiceMessages.DEL_FILE);
                 }
             }
         }
@@ -117,6 +118,7 @@ public class ClientHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        sendBasicMsg(ServiceMessages.ERROR);
         cause.printStackTrace();
         //logger.log(Level.FINE, "Error, Client disconnected: " + ctx.channel().remoteAddress());
         //ctx.close();

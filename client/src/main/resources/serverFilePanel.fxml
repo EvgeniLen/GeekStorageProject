@@ -6,7 +6,7 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.control.TableView?>
 
-<VBox alignment="center" xmlns="http://javafx.com/javafx/8.0.171" xmlns:fx="http://javafx.com/fxml/1" fx:controller="client.ServerFilePanelController">
+<VBox alignment="center" xmlns="http://javafx.com/javafx/8.0.171" xmlns:fx="http://javafx.com/fxml/1" fx:controller="client.filePanels.ServerFilePanelController">
         <VBox maxWidth="Infinity" HBox.hgrow="ALWAYS">
             <HBox>
                 <TextField fx:id="patchField" editable="false" HBox.hgrow="ALWAYS" />

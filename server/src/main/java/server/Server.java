@@ -11,6 +11,8 @@ import io.netty.handler.codec.serialization.ClassResolvers;
 import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.codec.serialization.ObjectEncoder;
 import org.apache.commons.codec.digest.DigestUtils;
+import server.handlers.ClientHandler;
+import server.handlers.SQLHandler;
 import service.serializedClasses.BasicRequest;
 
 import java.io.FileInputStream;

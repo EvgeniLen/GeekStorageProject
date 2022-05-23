@@ -10,7 +10,6 @@ import service.serializedClasses.RegRequest;
 
 
 public class RegController {
-
     @FXML
     public TextField loginField;
     public PasswordField passwordField;
@@ -24,7 +23,11 @@ public class RegController {
     public void clickBtnReg(ActionEvent actionEvent) {
         String login = loginField.getText().trim();
         String password = passwordField.getText().trim();
-        network.sendRequest(new RegRequest(login, password));
+        if (login.equals("") || password.equals("")) {
+            textArea.appendText("Заполните поля логин/пароль.\n");
+        } else {
+            network.sendRequest(new RegRequest(login, password));
+        }
     }
 
     public void regStatus(String result){

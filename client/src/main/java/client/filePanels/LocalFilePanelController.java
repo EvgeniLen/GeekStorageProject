@@ -1,4 +1,4 @@
-package client;
+package client.filePanels;
 
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -14,8 +14,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.format.DateTimeFormatter;
+import java.util.Collection;
 import java.util.ResourceBundle;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class LocalFilePanelController implements Initializable, BasicFilePanelController {
     public static final String DIR = "ClientDirectory" + File.separator;
@@ -25,41 +27,7 @@ public class LocalFilePanelController implements Initializable, BasicFilePanelCo
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         //Заполняем локальную таблицу
-        TableColumn<FileInfo, String> fileTypeColumn = new TableColumn<>();
-        fileTypeColumn.setCellValueFactory(param -> new SimpleStringProperty(param.getValue().getType().getName()));
-        fileTypeColumn.setMaxWidth(24);
-
-        TableColumn<FileInfo, String> fileNameColumn = new TableColumn<>("Имя");
-        fileNameColumn.setCellValueFactory(param -> new SimpleStringProperty(param.getValue().getFilename()));
-        fileNameColumn.setMaxWidth(240);
-
-        TableColumn<FileInfo, Long> fileSizeColumn = new TableColumn<>("Размер");
-        fileSizeColumn.setCellValueFactory(param -> new SimpleObjectProperty<>(param.getValue().getSize()));
-        fileSizeColumn.setMaxWidth(120);
-        fileSizeColumn.setCellFactory(column -> new TableCell<FileInfo, Long>(){
-            @Override
-            protected void updateItem(Long aLong, boolean b) {
-                super.updateItem(aLong, b);
-                if (aLong == null || b){
-                    setText(null);
-                    setStyle("");
-                } else {
-                    String text = String.format("%,d bytes", aLong);
-                    if (aLong == -1L) {
-                        text = "[DIR]";
-                    }
-                    setText(text);
-                }
-            }
-        });
-
-        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
-        TableColumn<FileInfo, String> fileDateColumn = new TableColumn<>("Дата изменения");
-        fileDateColumn.setCellValueFactory(param -> new SimpleStringProperty(param.getValue().getLastModified().format(dtf)));
-        fileDateColumn.setMaxWidth(240);
-
-        filesTable.getColumns().addAll(fileTypeColumn, fileNameColumn, fileSizeColumn, fileDateColumn);
-        filesTable.getSortOrder().add(fileTypeColumn);
+        PanelActions.initializePanel(filesTable);
 
         filesTable.setOnMouseClicked(mouseEvent -> {
             if(mouseEvent.getClickCount() == 2){
@@ -71,17 +39,17 @@ public class LocalFilePanelController implements Initializable, BasicFilePanelCo
         });
 
         updateList(Paths.get(DIR));
-        //Заполняем локальную таблицу
-
     }
 
     public void updateList(Path path){
         try {
             patchField.setText(path.normalize().toString());
             filesTable.getItems().clear();
-            filesTable.getItems().addAll(Files.list(path)
-                    .map(FileInfo::new)
-                    .collect(Collectors.toList()));
+            try (Stream<Path> paths = Files.list(path)){
+                filesTable.getItems().addAll(paths
+                        .map(FileInfo::new)
+                        .collect(Collectors.toList()));
+            }
             filesTable.sort();
         } catch (IOException e) {
             Alert alert = new Alert(Alert.AlertType.WARNING, "Не удалось обновить список файлов", ButtonType.OK);
@@ -96,6 +64,7 @@ public class LocalFilePanelController implements Initializable, BasicFilePanelCo
         }
     }
 
+    @Override
     public String getSelectedFileName(){
         if (!filesTable.isFocused() || filesTable.getSelectionModel().getSelectedItem() == null){
             return null;
@@ -103,6 +72,7 @@ public class LocalFilePanelController implements Initializable, BasicFilePanelCo
         return filesTable.getSelectionModel().getSelectedItem().getFilename();
     }
 
+    @Override
     public String getCurrentPath(){
         return patchField.getText();
     }
@@ -110,6 +80,7 @@ public class LocalFilePanelController implements Initializable, BasicFilePanelCo
     @Override
     public int isFileExists(String name) {
         return filesTable.getItems()
-                .filtered(fileInfo -> fileInfo.getFilename().equals(name)).size();
+                .filtered(fileInfo -> fileInfo.getFilename().equals(name))
+                .size();
     }
 }
