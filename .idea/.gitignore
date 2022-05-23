@@ -3,3 +3,7 @@
 /workspace.xml
 /ClientDirectory
 /ServerDirectory
+.idea/
+/client/target/
+/protocol/target/
+/server/target/

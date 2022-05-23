@@ -34,7 +34,7 @@ public class Network {
                         socketChannel.pipeline().addLast(
                                 new ObjectDecoder(MB_20, ClassResolvers.cacheDisabled(null)),
                                 new ObjectEncoder(),
-                                new ServerHandler(controller)
+                                new ClientHandler(controller)
                         );
                     }
                 });
@@ -52,6 +52,10 @@ public class Network {
 
     public void sendRequest(BasicRequest br) {
         channel.writeAndFlush(br);
+    }
+
+    public Channel getChannel() {
+        return channel;
     }
 
     public void close(){
