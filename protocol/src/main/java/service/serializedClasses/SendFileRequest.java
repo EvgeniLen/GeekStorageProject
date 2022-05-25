@@ -29,5 +29,6 @@ public class SendFileRequest extends BasicAuth implements BasicRequest {
     public FileInfo getFileInfo() {
         return fileInfo;
     }
+
 }
 

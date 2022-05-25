@@ -20,8 +20,6 @@ public class FileInfo implements Serializable {
             return name;
         }
     }
-
-    private Byte[] file;
     private String filename;
     private FileType type;
     private long size;
