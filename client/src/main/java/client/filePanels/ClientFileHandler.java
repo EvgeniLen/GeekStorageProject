@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -162,14 +163,18 @@ public class ClientFileHandler {
     }
 
     private int calculateDepth(Path srcPath) throws IOException {
-        int srcDepth;
+        AtomicInteger srcDepth = new AtomicInteger();
         try (Stream<Path> paths = Files.walk(srcPath)){
-            srcDepth = (int) paths.filter(Files::isDirectory)
-                    .map(Path::getParent)
-                    .distinct()
-                    .count();
+            paths.filter(Files::isDirectory)
+                    .sorted(Comparator.reverseOrder())
+                    .forEach(path -> {
+                        int i = path.toString().split("[\\\\/]").length;
+                        if (srcDepth.get() < i){
+                            srcDepth.set(i);
+                        }
+                    });
         }
-        return (srcDepth-1) + serverPC.getDepth();
+        return (srcDepth.get() - 1) + serverPC.getDepth();
     }
 
     private long calculateSize(Path srcPath) throws IOException {

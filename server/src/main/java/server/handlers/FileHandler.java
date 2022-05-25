@@ -15,6 +15,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -189,12 +190,17 @@ public class FileHandler {
     }
 
     private boolean calculateDepth(List<String> dir) {
-        int srcDepth;
-        srcDepth = (int) dir.stream()
-                .map(strPatch -> Path.of(strPatch).getParent())
-                .distinct()
-                .count();
+        AtomicInteger srcDepth = new AtomicInteger();
 
-        return Server.getConf("maxDepth") - (srcDepth-1) >= 0;
+        dir.stream()
+                .sorted(Comparator.reverseOrder())
+                .forEach(path -> {
+                    int i = path.split("[\\\\/]").length;
+                    if (srcDepth.get() < i){
+                        srcDepth.set(i);
+                    }
+                });
+        System.out.println(srcDepth.get());
+        return Server.getConf("maxDepth") - (srcDepth.get() - 1) >= 0;
     }
 }
