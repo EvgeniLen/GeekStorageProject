@@ -21,18 +21,29 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class FileHandler {
-    private static final int MB_5 = 5 * 1_000_000;
+    private static final int MB_1 = 1_000_000;
     private static final String DIR = "ServerDirectory" + File.separator;
     private static final Map<ChannelHandlerContext, FileChannel> mapFileChannel = new HashMap<>();
 
-    public void createUserDirectory(String login) {
+    private String login;
+    private ChannelHandlerContext channel;
+
+    public void setChannel(ChannelHandlerContext channel) {
+        this.channel = channel;
+    }
+
+    public void setLogin(String login) {
+        this.login = login;
+    }
+
+    public void createUserDirectory() {
         File directory = new File(DIR + login);
         if (!directory.exists()) {
             directory.mkdir();
         }
     }
 
-    public List<FileInfo> getFilesAndDirectories(GetFileListRequest request, ChannelHandlerContext channel) {
+    public List<FileInfo> getFilesAndDirectories(GetFileListRequest request) {
         try (Stream<Path> paths = Files.list(Path.of(DIR + request.getLogin() + File.separator + request.getSubDirection()))) {
             return paths
                     .map(FileInfo::new)
@@ -43,21 +54,27 @@ public class FileHandler {
         }
     }
 
-    public void createFile(SendFileRequest fileRequest, ChannelHandlerContext channel) {
-        Path path = Path.of(DIR, fileRequest.getLogin());
+    public void createFile(SendFileRequest fileRequest) {
         FileChannel fileChannel = null;
         try {
-            if (mapFileChannel.containsKey(channel) || isSpaceAvailable(path, fileRequest.getFileInfo().getSize())) {
-                path = Path.of(path.toString(), fileRequest.getServerPath());
-                ByteBuffer byteBuffer = ByteBuffer.wrap(fileRequest.getFile());
-                if (byteBuffer.hasRemaining()) {
-                    fileChannel = getFileChannel(channel, path);
-                    fileChannel.write(byteBuffer);
-                    byteBuffer.clear();
-                    channel.writeAndFlush(new FilePartResponse(true));
-                }
-                if (fileRequest.getFileInfo().getSize() == Files.size(path)) {
-                    removeChannel(fileChannel, channel);
+            if (mapFileChannel.containsKey(channel) || isSpaceAvailable(fileRequest.getFileInfo().getSize())) {
+                Path path = Path.of(DIR, login, fileRequest.getServerPath());
+                if (fileRequest.getFileInfo().getType().getName().equals("D")){
+                    Files.createDirectories(path);
+                    channel.writeAndFlush(new BasicResponse(ServiceMessages.F_SEND_OK));
+                } else {
+                    ByteBuffer byteBuffer = ByteBuffer.wrap(fileRequest.getFile());
+                    if (byteBuffer.hasRemaining()) {
+                        fileChannel = getFileChannel(path);
+                        fileChannel.write(byteBuffer);
+                        byteBuffer.clear();
+                    }
+                    if (fileRequest.getFileInfo().getSize() == Files.size(path)) {
+                        removeChannel(fileChannel);
+                        channel.writeAndFlush(new BasicResponse(ServiceMessages.F_SEND_OK));
+                    } else {
+                        channel.writeAndFlush(new FilePartResponse(true));
+                    }
                 }
             } else {
                 channel.writeAndFlush(new BasicResponse(ServiceMessages.EXCESS_Q));
@@ -68,7 +85,7 @@ public class FileHandler {
         }
     }
 
-    private void removeChannel(FileChannel fileChannel, ChannelHandlerContext channel) {
+    private void removeChannel(FileChannel fileChannel) {
         try {
             if (fileChannel != null) {
                 fileChannel.close();
@@ -79,8 +96,13 @@ public class FileHandler {
         }
     }
 
-    private boolean isSpaceAvailable(Path path, long size) throws IOException {
-        return Server.getConf("quota") >= (getSizeDirectory(path) + size);
+    public boolean isSpaceAvailable(long size) {
+        Path path = Path.of(DIR, login);
+        try {
+            return Server.getConf("quota") >= (getSizeDirectory(path) + size);
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     private long getSizeDirectory(Path path) throws IOException {
@@ -100,7 +122,7 @@ public class FileHandler {
         return size;
     }
 
-    private FileChannel getFileChannel(ChannelHandlerContext channel, Path path) throws FileNotFoundException {
+    private FileChannel getFileChannel(Path path) throws FileNotFoundException {
         FileChannel fileChannel = mapFileChannel.get(channel);
         if (fileChannel == null) {
             RandomAccessFile fileForSend = new RandomAccessFile(path.toFile(), "rw");
@@ -110,7 +132,7 @@ public class FileHandler {
         return fileChannel;
     }
 
-    public void sendFileToLocal(BasicFileRequest request, ChannelHandlerContext channel, String typeR) {
+    public void sendFileToLocal(BasicFileRequest request, String typeR) {
         Path srcPath = Path.of(DIR, request.getLogin(), request.getServerPath());
         try (Stream<Path> paths = Files.walk(srcPath)) {
             paths.forEach(path -> {
@@ -128,7 +150,7 @@ public class FileHandler {
         try {
             if (!path.toFile().isDirectory()) {
                 RandomAccessFile fileForSend = new RandomAccessFile(path.toFile(), "rw");
-                ByteBuffer byteBuffer = ByteBuffer.allocate(MB_5);
+                ByteBuffer byteBuffer = ByteBuffer.allocate(MB_1);
                 FileChannel fileChannel = fileForSend.getChannel();
                 while (fileChannel.read(byteBuffer) != -1) {
                     bytes = new byte[byteBuffer.flip().remaining()];
@@ -159,32 +181,6 @@ public class FileHandler {
             }
         } catch (IOException e) {
             channel.writeAndFlush(new BasicResponse(ServiceMessages.ERROR_DF));
-            throw new RuntimeException(e);
-        }
-    }
-
-    public void createDirectories(SendDirectoriesRequest request, ChannelHandlerContext channel) {
-        try {
-            if (calculateDepth(request.getDirectories())) {
-                if (isSpaceAvailable(Path.of(DIR, request.getLogin()), request.getSize())){
-                    request.getDirectories().stream()
-                            .map(str -> Path.of(DIR, request.getLogin(), str))
-                            .forEach(path -> {
-                                try {
-                                    Files.createDirectories(path);
-                                } catch (IOException e) {
-                                    throw new RuntimeException(e);
-                                }
-                            });
-                    channel.writeAndFlush(new BasicResponse(ServiceMessages.SEND_DIR_ALR));
-                } else {
-                    channel.writeAndFlush(new BasicResponse(ServiceMessages.EXCESS_Q));
-                }
-            } else {
-                channel.writeAndFlush(new BasicResponse(ServiceMessages.ERROR_MAX_DEPTH));
-            }
-        } catch (IOException e) {
-            channel.writeAndFlush(new BasicResponse(ServiceMessages.ERROR_SEND_D));
             throw new RuntimeException(e);
         }
     }

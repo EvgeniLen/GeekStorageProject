@@ -49,17 +49,11 @@ public class ClientHandler extends ChannelInboundHandlerAdapter {
         } else if (responseText.equals(ServiceMessages.ERROR_MAX_DEPTH)) {
             controller.getAlertError("В отправляемой директории превышено разрешенное\n кол-во вложенных директорий.\n Уменьшите кол-во директорий для отправки.");
             return;
-        } else if (responseText.equals(ServiceMessages.ERROR_SEND_D)) {
-            controller.getAlertError("Ошибка при отправке файла на сервер.");
+        } else if (responseText.equals(ServiceMessages.ERR_MAX_D_EX_Q)) {
+            controller.getAlertError("Превышена максимальная клубина отправляемой\nдиректории или превышена квота, передача невозможна.");
             return;
-        } else if (responseText.equals(ServiceMessages.SEND_DIR_ALR)) {
-            //получили что ошибки нет, можно передавать файлы
-            fileHandler.sendFiles(fileHandler.getSrcPath(), controller.getLogin(), controller.getPassword());
-            GetFileListRequest fileListRequest = new GetFileListRequest(controller.getLogin(), controller.getPassword(), controller.getServerPC().getCurrentPath());
-            ctx.writeAndFlush(fileListRequest);
-            return;
-        }  else if (responseText.equals(ServiceMessages.REG_OK) ||
-                    responseText.equals(ServiceMessages.REG_NO)) {
+        } else if (responseText.equals(ServiceMessages.REG_OK) ||
+                responseText.equals(ServiceMessages.REG_NO)) {
             controller.getRegController().regStatus(responseText);
             return;
         } else if (responseText.equals(ServiceMessages.RETURN_FILE_L)) {
@@ -68,13 +62,23 @@ public class ClientHandler extends ChannelInboundHandlerAdapter {
             controller.getServerPC().setNetwork(controller.getNetwork());
             controller.getServerPC().updateList(getFileListResponse.getSubDirection(), fileList);
             return;
-//        } else if (responseText.equals(ServiceMessages.UPLOAD_FILE_R)) {
-//            boolean success = ((FilePartResponse) response).isSuccess();
-//            if (!success) {
-//                controller.getAlertError("Отправка файла не удалась, попробуте еще раз.");
-//                return;
-//            }
-//            return;
+        } else if (responseText.equals(ServiceMessages.PERMISSION_OK)) {
+            fileHandler.setFileNumber(0);
+            fileHandler.sendFiles();
+            return;
+        } else if (responseText.equals(ServiceMessages.UPLOAD_FILE_R)) {
+            boolean success = ((FilePartResponse) response).isSuccess();
+            if (!success) {
+                fileHandler.repeatSendFile();
+                return;
+            }
+            fileHandler.sendFiles();
+            return;
+        } else if (responseText.equals(ServiceMessages.F_SEND_OK)) {
+            ctx.writeAndFlush(new GetFileListRequest(controller.getLogin(), controller.getPassword(), controller.getServerPC().getCurrentPath()));
+            fileHandler.incFileNumber();
+            fileHandler.sendFiles();
+            return;
         } else if (responseText.equals(ServiceMessages.UPLOAD_FILE)) {
             if (fileHandler.getServerFile((FileResponse ) response)){
                 controller.getLocalPC().updateList(Paths.get(controller.getLocalPC().getCurrentPath()));

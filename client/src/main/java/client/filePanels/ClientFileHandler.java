@@ -4,10 +4,7 @@ import client.Controller;
 import client.Network;
 import service.serializedClasses.*;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
@@ -20,19 +17,31 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class ClientFileHandler {
-    private static final int MB_1 = 1_000_000;
+    private static final int MB_2 = 2 * 1_000_000;
     private static final Map<String, FileChannel> mapFileChannel = new HashMap<>();
     private static ClientFileHandler handler;
     private ServerFilePanelController serverPC;
     private int maxDepth;
     private Network network;
     private Controller controller;
-    private RandomAccessFile fileForSend;
-    private int part;
-    private Path srcPath;
+    private boolean needDelete;
+    private String login;
+    private String password;
+    private Path localPath;
+    private Path srcPatch;
+    private int fileNumber;
+    private FileChannel fileChannel;
+    private Map<Path, Path> directories = new HashMap<>();
 
-    public Path getSrcPath() {
-        return srcPath;
+    private SendFileRequest repeatSendFile;
+
+    public void setFileNumber(int fileNumber) {
+        this.fileNumber = fileNumber;
+    }
+
+    public void incFileNumber() {
+        mapFileChannel.remove(localPath.toString());
+        this.fileNumber++;
     }
 
     public static ClientFileHandler getHandler(){
@@ -42,61 +51,76 @@ public class ClientFileHandler {
         return handler;
     }
 
-    public void setFilePanel(ServerFilePanelController serverPC) {
+    public void setProperties(ServerFilePanelController serverPC, Network network, Controller controller, String login, String password) {
         this.serverPC = serverPC;
-    }
-    public void setController(Controller controller) {
         this.controller = controller;
+        this.network = network;
+        this.login = login;
+        this.password = password;
     }
-
 
     public void setMaxDepth(int maxDepth) {
         this.maxDepth = maxDepth;
     }
 
-    public void setNetwork(Network network) {
-        this.network = network;
+    private void sweep(){
+        fileNumber = 0;
+        directories.clear();
+        try {
+            if (fileChannel != null) {
+                fileChannel.close();
+            }
+            if (needDelete) {
+                deleteFiles(srcPatch);
+                controller.getLocalPC().updateList(Paths.get(controller.getLocalPC().getCurrentPath()));
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
     }
 
-    public void sendFiles(Path srcPath, String login, String password) {
-        try (Stream<Path> paths = Files.walk(srcPath)) {
-            paths
-                    .filter(Files::isRegularFile)
-                    .forEach(path -> {
-                        part = 0;
-                        Path dstPath = Paths.get(serverPC.getCurrentPath()).resolve(srcPath.getParent().relativize(path));
-                        splitFile(path, (data) -> {
-                            SendFileRequest sendFileRequest = new SendFileRequest(login, password, data, dstPath.toString(), new FileInfo(path));
-                            try {
-                                network.getChannel().writeAndFlush(sendFileRequest).sync();
-                            } catch (InterruptedException e) {
-                                throw new RuntimeException(e);
-                            }
-                        });
-                    });
-            GetFileListRequest fileListRequest = new GetFileListRequest(login, password, serverPC.getCurrentPath());
-            network.sendRequest(fileListRequest);
-        } catch (IOException e) {
-            controller.getAlertError("Не удалось скопировать файл.");
+    public void sendFiles() {
+        if (fileNumber >= directories.size()) {
+            sweep();
+            return;
+        }
+        localPath = new ArrayList<>(directories.keySet()).get(fileNumber);
+        splitFile(localPath, (data) -> {
+            SendFileRequest sendFileRequest = new SendFileRequest(login, password, data, directories.get(localPath).toString(), new FileInfo(localPath));
+            repeatSendFile = sendFileRequest;
+            try {
+                network.getChannel().writeAndFlush(sendFileRequest).sync();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    public void repeatSendFile(){
+        try {
+            network.getChannel().writeAndFlush(repeatSendFile).sync();
+        } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
 
     public void splitFile(Path path, Consumer<byte[]> filePartCons) {
-        byte[] bytes;
+        byte[] filePart;
         try {
-            fileForSend = new RandomAccessFile(path.toFile(), "rw");
-            ByteBuffer byteBuffer = ByteBuffer.allocate(MB_1);
-            FileChannel fileChannel = fileForSend.getChannel();
-            while (fileChannel.read(byteBuffer, MB_1 * part) != -1) {
-                bytes = new byte[byteBuffer.flip().remaining()];
-                byteBuffer.get(bytes);
-                filePartCons.accept(bytes);
-                byteBuffer.clear();
-                part++;
+            if (!Files.isDirectory(path)){
+                ByteBuffer byteBuffer = ByteBuffer.allocate(MB_2);
+                fileChannel = getFileChannel(path.toString());
+                while (fileChannel.read(byteBuffer) != -1) {
+                    filePart = new byte[byteBuffer.flip().remaining()];
+                    byteBuffer.get(filePart);
+                    byteBuffer.clear();
+                    filePartCons.accept(filePart);
+                    return;
+                }
+            }else {
+                filePartCons.accept(new byte[0]);
             }
-            fileForSend.close();
-
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -138,28 +162,6 @@ public class ClientFileHandler {
             throw new RuntimeException();
         }
         return false;
-    }
-
-    public void sendDirectory(Path srcPath, String login, String password) {
-        this.srcPath = srcPath;
-        try {
-            List<String> directories;
-            if (maxDepth - calculateDepth(srcPath) >= 0) {
-                try (Stream<Path> paths = Files.walk(srcPath)) {
-                    directories = paths
-                            .filter(Files::isDirectory)
-                            .sorted(Comparator.naturalOrder())
-                            .map(path -> Paths.get(serverPC.getCurrentPath()).resolve(srcPath.getParent().relativize(path)).toString())
-                            .collect(Collectors.toList());
-                }
-                SendDirectoriesRequest directoriesRequest = new SendDirectoriesRequest(login, password, directories, calculateSize(srcPath));
-                network.getChannel().writeAndFlush(directoriesRequest).sync();
-            } else {
-                controller.getAlertError("В отправляемой директории превышено разрешенное\nкол-во вложенных директорий.\nУменьшите кол-во директорий для отправки.");
-            }
-        } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     private int calculateDepth(Path srcPath) throws IOException {
@@ -204,5 +206,24 @@ public class ClientFileHandler {
         } else {
             Files.delete(path);
         }
+    }
+
+    public void getPermission(Path srcPath) throws IOException {
+        int depth = calculateDepth(srcPath);
+        if (maxDepth - depth >= 0) {
+            try (Stream<Path> paths = Files.walk(srcPath)) {
+                directories = paths
+                        .collect(Collectors.toMap(p1 -> p1, p2 -> Paths.get(serverPC.getCurrentPath()).resolve(srcPath.getParent().relativize(p2))));
+            }
+            GetPermissionRequest permissionRequest = new GetPermissionRequest(login, password, depth, calculateSize(srcPath));
+            network.getChannel().writeAndFlush(permissionRequest);
+        } else {
+            controller.getAlertError("В отправляемой директории превышено разрешенное\nкол-во вложенных директорий.\nУменьшите кол-во директорий для отправки.");
+        }
+    }
+
+    public void NeedDeletePatch(Path srcPath, boolean b) {
+        this.srcPatch = srcPath;
+        this.needDelete = b;
     }
 }

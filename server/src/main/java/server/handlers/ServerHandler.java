@@ -35,7 +35,9 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
                 if (!server.isLoginAuthenticated(login)){
                     sendBasicMsg(ServiceMessages.AUTH_OK);
                     sendBasicMsg(String.format("%s:%d", ServiceMessages.CONF_MAX_DEPTH, Server.getConf("maxDepth")));
-                    fileHandler.createUserDirectory(login); // создание серверной директории пользователя, если нет
+                    fileHandler.setLogin(login);
+                    fileHandler.setChannel(channel);
+                    fileHandler.createUserDirectory(); // создание серверной директории пользователя, если нет
                     server.addClient(login, authRequest.getPassword());
                     logger.log(Level.INFO, "Client " + login + " authenticated");
                 }else {
@@ -51,7 +53,6 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
         }else if (request instanceof RegRequest regRequest){
             logger.log(Level.FINE, String.format("Registration request from %s", regRequest.getLogin()));
             if (server.getAuthService().registration(regRequest.getLogin(), DigestUtils.sha256Hex(regRequest.getPassword()))) {
-                fileHandler.createUserDirectory(regRequest.getLogin()); // создание серверной директории пользователя, если нет
                 sendBasicMsg(ServiceMessages.REG_OK);
             } else {
                 sendBasicMsg(ServiceMessages.REG_NO);
@@ -59,29 +60,33 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
         }else if (request instanceof GetFileListRequest){
             if (server.checkAuthorization(request)){
                 logger.log(Level.FINE, String.format("GetFileList request from %s", (request.getLogin())));
-                List<FileInfo> listFiles = fileHandler.getFilesAndDirectories((GetFileListRequest) request, channel);
-
+                List<FileInfo> listFiles = fileHandler.getFilesAndDirectories((GetFileListRequest) request);
                 channel.writeAndFlush(new GetFileListResponse(((GetFileListRequest) request).getSubDirection(), listFiles));
             }
-        } else if (request instanceof SendDirectoriesRequest){
+        } else if (request instanceof GetPermissionRequest){
             if (server.checkAuthorization(request)){
-                logger.log(Level.FINE, String.format("SendDirectories request from %s", (request.getLogin())));
-                fileHandler.createDirectories((SendDirectoriesRequest) request, channel);
+                logger.log(Level.FINE, String.format("GetPermission request from %s", (request.getLogin())));
+                if (Server.getConf("maxDepth") - ((GetPermissionRequest) request).getDepth() >= 0 &&
+                        fileHandler.isSpaceAvailable(((GetPermissionRequest) request).getSize())) {
+                    sendBasicMsg(ServiceMessages.PERMISSION_OK);
+                } else {
+                    sendBasicMsg(ServiceMessages.ERR_MAX_D_EX_Q);
+                }
             }
         } else if (request instanceof SendFileRequest){
             if (server.checkAuthorization(request)){
                 logger.log(Level.FINE, String.format("SendFile request from %s", (request.getLogin())));
-                fileHandler.createFile((SendFileRequest) request, channel);
+                fileHandler.createFile((SendFileRequest) request);
             }
         } else if (request instanceof UploadFileRequest){
             if (server.checkAuthorization(request)){
                 logger.log(Level.FINE, String.format("UploadFile request from %s", (request.getLogin())));
-                fileHandler.sendFileToLocal((UploadFileRequest)request, channel, ServiceMessages.UPLOAD_FILE);
+                fileHandler.sendFileToLocal((UploadFileRequest)request, ServiceMessages.UPLOAD_FILE);
             }
         } else if (request instanceof MoveFileRequest){
             if (server.checkAuthorization(request)){
                 logger.log(Level.FINE, String.format("MoveFile request from %s", (request.getLogin())));
-                fileHandler.sendFileToLocal((MoveFileRequest)request, channel, ServiceMessages.MOVE_FILE);
+                fileHandler.sendFileToLocal((MoveFileRequest)request, ServiceMessages.MOVE_FILE);
                 fileHandler.deleteFiles(request.getLogin(), ((MoveFileRequest) request).getServerPath(), channel);
             }
         } else if (request instanceof DelFileRequest){

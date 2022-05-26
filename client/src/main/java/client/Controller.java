@@ -105,9 +105,9 @@ public class Controller  implements Initializable{
             password = passwordField.getText().trim();
             localPC = (LocalFilePanelController) localPanel.getProperties().get("ctrl");
             serverPC = (ServerFilePanelController) serverPanel.getProperties().get("ctrl");
-            fileHandler.setFilePanel(serverPC);
-            fileHandler.setNetwork(network);
-            fileHandler.setController(this);
+            fileHandler.setProperties(serverPC, network, this, login, password);
+            //fileHandler.setNetwork(network);
+            //fileHandler.setController(this);
             serverPC.setController(this);
         }
     }
@@ -160,22 +160,23 @@ public class Controller  implements Initializable{
             return;
         }
 
-        //Копировование с локала на сервер
-        if (localPC.getSelectedFileName() != null) {
-            srcPath = Paths.get(localPC.getCurrentPath(), localPC.getSelectedFileName());
-            if (checkFile(localPC.getSelectedFileName(), serverPC)) {
-                if (srcPath.toFile().isDirectory()) {
-                    fileHandler.sendDirectory(srcPath, login, password);
-                } else {
-                    fileHandler.sendFiles(srcPath, login, password);
+        try {
+            //Копировование с локала на сервер
+            if (localPC.getSelectedFileName() != null) {
+                srcPath = Paths.get(localPC.getCurrentPath(), localPC.getSelectedFileName());
+                if (checkFile(localPC.getSelectedFileName(), serverPC)) {
+                    fileHandler.getPermission(srcPath);
+                }
+            } else if (serverPC.getSelectedFileName() != null) {
+                srcPath = Paths.get(serverPC.getCurrentPath().equals(File.separator) ? "" : serverPC.getCurrentPath(), serverPC.getSelectedFileName());
+                dstPath = Paths.get(localPC.getCurrentPath());
+                if (checkFile(serverPC.getSelectedFileName(), localPC)) {
+                    network.sendRequest(new UploadFileRequest(login, password, srcPath.toString(), dstPath.toString()));
                 }
             }
-        } else if (serverPC.getSelectedFileName() != null) {
-            srcPath = Paths.get(serverPC.getCurrentPath().equals(File.separator) ? "" : serverPC.getCurrentPath(), serverPC.getSelectedFileName());
-            dstPath = Paths.get(localPC.getCurrentPath());
-            if (checkFile(serverPC.getSelectedFileName(), localPC)) {
-                network.sendRequest(new UploadFileRequest(login, password, srcPath.toString(), dstPath.toString()));
-            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            getAlert("Не удалось копировать указанный файл.");
         }
     }
 
@@ -189,14 +190,9 @@ public class Controller  implements Initializable{
             //Перемещение с локала на сервер
             if (localPC.getSelectedFileName() != null) {
                 srcPath = Paths.get(localPC.getCurrentPath(), localPC.getSelectedFileName());
-                fileHandler.sendFiles(srcPath, login, password);
-                if (srcPath.toFile().isDirectory()) {
-                    fileHandler.sendDirectory(srcPath, login, password);
-                } else {
-                    fileHandler.sendFiles(srcPath, login, password);
-                }
-                fileHandler.deleteFiles(srcPath);
-                localPC.updateList(Paths.get(localPC.getCurrentPath()));
+                fileHandler.getPermission(srcPath);
+                fileHandler.NeedDeletePatch(srcPath, true);
+
             } else if (serverPC.getSelectedFileName() != null) {
                 srcPath = Paths.get(serverPC.getCurrentPath().equals(File.separator) ? "": serverPC.getCurrentPath(), serverPC.getSelectedFileName());
                 dstPath = Paths.get(localPC.getCurrentPath());
