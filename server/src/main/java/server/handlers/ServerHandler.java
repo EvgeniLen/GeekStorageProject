@@ -11,22 +11,14 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class ClientHandler extends ChannelInboundHandlerAdapter {
-    private static final Logger logger = Logger.getLogger(ClientHandler.class.getName());
+public class ServerHandler extends ChannelInboundHandlerAdapter {
+    private static final Logger logger = Logger.getLogger(ServerHandler.class.getName());
     private final Server server;
     private final FileHandler fileHandler;
     private ChannelHandlerContext channel;
     private String login;
-    
 
-    /*private static final Map<Class<? extends BasicRequest>, Consumer<ChannelHandlerContext>> REQUEST_HANDLERS = new HashMap<>();
-
-    static {
-        REQUEST_HANDLERS.put(AuthRequest.class, channelHandlerContext -> {
-
-        });
-    }*/
-    public ClientHandler(Server server) {
+    public ServerHandler(Server server) {
         this.server = server;
         fileHandler = new FileHandler();
     }
@@ -43,7 +35,9 @@ public class ClientHandler extends ChannelInboundHandlerAdapter {
                 if (!server.isLoginAuthenticated(login)){
                     sendBasicMsg(ServiceMessages.AUTH_OK);
                     sendBasicMsg(String.format("%s:%d", ServiceMessages.CONF_MAX_DEPTH, Server.getConf("maxDepth")));
-                    fileHandler.createUserDirectory(login); // создание серверной директории пользователя, если нет
+                    fileHandler.setLogin(login);
+                    fileHandler.setChannel(channel);
+                    fileHandler.createUserDirectory(); // создание серверной директории пользователя, если нет
                     server.addClient(login, authRequest.getPassword());
                     logger.log(Level.INFO, "Client " + login + " authenticated");
                 }else {
@@ -59,7 +53,6 @@ public class ClientHandler extends ChannelInboundHandlerAdapter {
         }else if (request instanceof RegRequest regRequest){
             logger.log(Level.FINE, String.format("Registration request from %s", regRequest.getLogin()));
             if (server.getAuthService().registration(regRequest.getLogin(), DigestUtils.sha256Hex(regRequest.getPassword()))) {
-                fileHandler.createUserDirectory(regRequest.getLogin()); // создание серверной директории пользователя, если нет
                 sendBasicMsg(ServiceMessages.REG_OK);
             } else {
                 sendBasicMsg(ServiceMessages.REG_NO);
@@ -68,34 +61,41 @@ public class ClientHandler extends ChannelInboundHandlerAdapter {
             if (server.checkAuthorization(request)){
                 logger.log(Level.FINE, String.format("GetFileList request from %s", (request.getLogin())));
                 List<FileInfo> listFiles = fileHandler.getFilesAndDirectories((GetFileListRequest) request);
-                GetFileListResponse getFileListResponse = new GetFileListResponse(((GetFileListRequest) request).getSubDirection(), listFiles);
-                channel.writeAndFlush(getFileListResponse);
+                channel.writeAndFlush(new GetFileListResponse(((GetFileListRequest) request).getSubDirection(), listFiles));
+            }
+        } else if (request instanceof GetPermissionRequest){
+            if (server.checkAuthorization(request)){
+                logger.log(Level.FINE, String.format("GetPermission request from %s", (request.getLogin())));
+                if (Server.getConf("maxDepth") - ((GetPermissionRequest) request).getDepth() >= 0 &&
+                        fileHandler.isSpaceAvailable(((GetPermissionRequest) request).getSize())) {
+                    sendBasicMsg(ServiceMessages.PERMISSION_OK);
+                } else {
+                    sendBasicMsg(ServiceMessages.ERR_MAX_D_EX_Q);
+                }
             }
         } else if (request instanceof SendFileRequest){
             if (server.checkAuthorization(request)){
                 logger.log(Level.FINE, String.format("SendFile request from %s", (request.getLogin())));
-                fileHandler.createFile((SendFileRequest) request, channel);
+                fileHandler.createFile((SendFileRequest) request);
             }
         } else if (request instanceof UploadFileRequest){
             if (server.checkAuthorization(request)){
                 logger.log(Level.FINE, String.format("UploadFile request from %s", (request.getLogin())));
-                fileHandler.sendFileToLocal((UploadFileRequest)request, channel, ServiceMessages.UPLOAD_FILE);
+                fileHandler.sendFileToLocal((UploadFileRequest)request, ServiceMessages.UPLOAD_FILE);
             }
         } else if (request instanceof MoveFileRequest){
             if (server.checkAuthorization(request)){
                 logger.log(Level.FINE, String.format("MoveFile request from %s", (request.getLogin())));
-                fileHandler.sendFileToLocal((MoveFileRequest)request, channel, ServiceMessages.MOVE_FILE);
-                fileHandler.deleteFiles(request.getLogin(), ((MoveFileRequest) request).getServerPath());
+                fileHandler.sendFileToLocal((MoveFileRequest)request, ServiceMessages.MOVE_FILE);
+                fileHandler.deleteFiles(request.getLogin(), ((MoveFileRequest) request).getServerPath(), channel);
             }
         } else if (request instanceof DelFileRequest){
             if (server.checkAuthorization(request)){
                 logger.log(Level.FINE, String.format("DelFile request from %s", (request.getLogin())));
-                if (fileHandler.deleteFiles(request.getLogin(), ((DelFileRequest) request).getServerPath())){
-                    sendBasicMsg(ServiceMessages.DEL_FILE);
-                }
+                fileHandler.deleteFiles(request.getLogin(), ((DelFileRequest) request).getServerPath(), channel);
+                sendBasicMsg(ServiceMessages.DEL_FILE);
             }
         }
-
     }
 
     public void sendBasicMsg(String msg){

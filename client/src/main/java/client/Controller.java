@@ -1,9 +1,6 @@
 package client;
 
-import client.filePanels.BasicFilePanelController;
-import client.filePanels.FileActions;
-import client.filePanels.LocalFilePanelController;
-import client.filePanels.ServerFilePanelController;
+import client.filePanels.*;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -17,23 +14,15 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
-import service.ServiceMessages;
 import service.serializedClasses.*;
 
 
 import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.net.URL;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Comparator;
 import java.util.ResourceBundle;
-import java.util.function.Consumer;
-import java.util.stream.Stream;
 
 public class Controller  implements Initializable{
     @FXML
@@ -49,18 +38,16 @@ public class Controller  implements Initializable{
 
     private String login;
     private String password;
-    public Stage regStage;
+    private Stage regStage;
     private RegController regController;
     private LocalFilePanelController localPC;
     private ServerFilePanelController serverPC;
     private Network network;
-    private int maxDepth;
     private Stage stage;
     private Alert errorAlert;
-
-    public void setMaxDepth(int maxDepth) {
-        this.maxDepth = maxDepth;
-    }
+    private ClientFileHandler fileHandler;
+    private Path srcPath;
+    private Path dstPath;
 
     public RegController getRegController() {
         return regController;
@@ -95,6 +82,7 @@ public class Controller  implements Initializable{
             });
         });
         network = new Network(this);
+        fileHandler = ClientFileHandler.getHandler();
         setAuthenticated(false);
     }
 
@@ -116,8 +104,10 @@ public class Controller  implements Initializable{
             login = loginField.getText().trim();
             password = passwordField.getText().trim();
             localPC = (LocalFilePanelController) localPanel.getProperties().get("ctrl");
-
             serverPC = (ServerFilePanelController) serverPanel.getProperties().get("ctrl");
+            fileHandler.setProperties(serverPC, network, this, login, password);
+            //fileHandler.setNetwork(network);
+            //fileHandler.setController(this);
             serverPC.setController(this);
         }
     }
@@ -173,18 +163,20 @@ public class Controller  implements Initializable{
         try {
             //Копировование с локала на сервер
             if (localPC.getSelectedFileName() != null) {
-                Path srcPath = Paths.get(localPC.getCurrentPath(), localPC.getSelectedFileName());
-                sendFiles(srcPath);
+                srcPath = Paths.get(localPC.getCurrentPath(), localPC.getSelectedFileName());
+                if (checkFile(localPC.getSelectedFileName(), serverPC)) {
+                    fileHandler.getPermission(srcPath);
+                }
             } else if (serverPC.getSelectedFileName() != null) {
-                Path srcPath = Paths.get(serverPC.getCurrentPath().equals(File.separator) ? "": serverPC.getCurrentPath(), serverPC.getSelectedFileName());
-                Path dstPath = Paths.get(localPC.getCurrentPath());
+                srcPath = Paths.get(serverPC.getCurrentPath().equals(File.separator) ? "" : serverPC.getCurrentPath(), serverPC.getSelectedFileName());
+                dstPath = Paths.get(localPC.getCurrentPath());
                 if (checkFile(serverPC.getSelectedFileName(), localPC)) {
                     network.sendRequest(new UploadFileRequest(login, password, srcPath.toString(), dstPath.toString()));
                 }
             }
         } catch (IOException e) {
             e.printStackTrace();
-            getAlert("Не удалось скопировать указанный файл.");
+            getAlert("Не удалось копировать указанный файл.");
         }
     }
 
@@ -197,13 +189,13 @@ public class Controller  implements Initializable{
         try {
             //Перемещение с локала на сервер
             if (localPC.getSelectedFileName() != null) {
-                Path srcPath = Paths.get(localPC.getCurrentPath(), localPC.getSelectedFileName());
-                sendFiles(srcPath);
-                FileActions.deleteFiles(srcPath);
-                localPC.updateList(Paths.get(localPC.getCurrentPath()));
+                srcPath = Paths.get(localPC.getCurrentPath(), localPC.getSelectedFileName());
+                fileHandler.getPermission(srcPath);
+                fileHandler.NeedDeletePatch(srcPath, true);
+
             } else if (serverPC.getSelectedFileName() != null) {
-                Path srcPath = Paths.get(serverPC.getCurrentPath().equals(File.separator) ? "": serverPC.getCurrentPath(), serverPC.getSelectedFileName());
-                Path dstPath = Paths.get(localPC.getCurrentPath());
+                srcPath = Paths.get(serverPC.getCurrentPath().equals(File.separator) ? "": serverPC.getCurrentPath(), serverPC.getSelectedFileName());
+                dstPath = Paths.get(localPC.getCurrentPath());
                 if (checkFile(serverPC.getSelectedFileName(), localPC)){
                     network.sendRequest(new MoveFileRequest(login, password, srcPath.toString(), dstPath.toString()));
                 }
@@ -221,11 +213,11 @@ public class Controller  implements Initializable{
         }
         try {
             if (localPC.getSelectedFileName() != null) {
-                Path srcPath = Paths.get(localPC.getCurrentPath(), localPC.getSelectedFileName());
-                FileActions.deleteFiles(srcPath);
+                srcPath = Paths.get(localPC.getCurrentPath(), localPC.getSelectedFileName());
+                fileHandler.deleteFiles(srcPath);
                 localPC.updateList(Paths.get(localPC.getCurrentPath()));
             } else if (serverPC.getSelectedFileName() != null) {
-                Path srcPath = Paths.get(serverPC.getCurrentPath().equals(File.separator) ? "" : serverPC.getCurrentPath(), serverPC.getSelectedFileName());
+                srcPath = Paths.get(serverPC.getCurrentPath().equals(File.separator) ? "" : serverPC.getCurrentPath(), serverPC.getSelectedFileName());
                 network.sendRequest(new DelFileRequest(login, password, srcPath.toString()));
             }
         } catch (IOException e) {
@@ -255,19 +247,5 @@ public class Controller  implements Initializable{
         }
         errorAlert = new Alert(Alert.AlertType.ERROR, text, ButtonType.OK);
         errorAlert.showAndWait();
-    }
-
-    private void sendFiles(Path srcPath) throws IOException {
-        if (checkFile(localPC.getSelectedFileName(), serverPC)) {
-            if (maxDepth - serverPC.getDepth() >= 0) {
-                try (Stream<Path> paths = Files.walk(srcPath)){
-                    paths.forEach(path -> {
-                            Path dstPath = Paths.get(serverPC.getCurrentPath()).resolve(srcPath.getParent().relativize(path));
-                            FileActions.splitFile(path, data -> network.sendRequest(new SendFileRequest(login, password, data, dstPath.toString(), new FileInfo(path))));
-                    });
-                }
-                network.sendRequest(new GetFileListRequest(login, password, serverPC.getCurrentPath()));
-            }
-        }
     }
 }
